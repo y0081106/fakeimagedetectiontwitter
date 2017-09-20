@@ -4,6 +4,7 @@ import re
 import requests
 import string
 import urllib, json
+import urllib2
 import time
 import nltk
 import csv
@@ -18,14 +19,24 @@ from nltk.tokenize import word_tokenize
 from sklearn.model_selection import train_test_split
 from langdetect import detect
 from collections import Counter
-
 start_time = time.time()
-tweets_data_path = 'C:/Users/imaad/twitteradvancedsearch/papertweetstrial.json'
-tweets_data, ifl_result, tweet_id, tweetText, tweetTextLen, numItemWords, questionSymbol, exclamSymbol,
-numQuesSymbol, numExclamSymbol, happyEmo,sadEmo, numUpperCase, containFirstPron,containSecPron,containThirdPron,
-numMentions, numHashtags, numUrls, positiveWords, negativeWords, slangWords, pleasePresent, rtCount,  
-colonSymbol, externLinkPresent, indegreeval, harmonicval, AlexaPopularity, AlexaReach, AlexaDelta, AlexaCountry,
-WotValue, numberNouns, readabilityValue, Indegree, Harmonic  = []   ([] for i in range(37))
+tweets_data_path = 'C:/Users/imaad/twitteradvancedsearch/fake_real_tweets_training.json'
+tweets_data = []
+ifl_result = []
+tweet_id = [] 
+tweetText = []
+tweetTextLen = []
+numItemWords = []
+questionSymbol = []
+exclamSymbol = []
+numQuesSymbol = []
+numExclamSymbol = [] 
+happyEmo,sadEmo = [],[]
+numUpperCase, containFirstPron,containSecPron,containThirdPron = [],[],[],[]
+numMentions, numHashtags, numUrls, positiveWords, negativeWords = [],[],[],[],[]
+slangWords,pleasePresent, rtCount, colonSymbol, externLinkPresent = [],[],[],[],[]
+indegreeval, harmonicval,AlexaPopularity, AlexaReach, AlexaDelta,AlexaCountry, WotValue, numberNouns, readabilityValue  = [],[],[],[],[],[],[],[],[]
+Indegree, Harmonic = [],[]
 
 tweets_file = open(tweets_data_path, "r")          
 for line in tweets_file:
@@ -44,21 +55,21 @@ for line in tweets_file:
         return twIdStr
 
     def getText(tweets_data):
-        postText = map(lambda tweet: tweet['full_text'], tweets_data)
+        postText = map(lambda tweet: tweet['text'], tweets_data)
         for i in postText:
             postTextStr = i.encode('utf-8', 'ignore')
         #postTextStr = ''.join(str(i) for i in postText)
         return postTextStr
     
     def getTextLen(tweets_data):
-        postText = map(lambda tweet: tweet['full_text'], tweets_data)
+        postText = map(lambda tweet: tweet['text'], tweets_data)
         for i in postText:
             postTextStr = i.encode('utf-8', 'ignore')
         #postTextStr = ''.join(str(i) for i in postText)
         return len(postTextStr)
 
     def getNumItemWords(tweets_data):
-        postText = map(lambda tweet: tweet['full_text'], tweets_data )
+        postText = map(lambda tweet: tweet['text'], tweets_data )
         #postTextStr = ''.join(str(i) for i in postText)
         for i in postText:
             postTextStr = i.encode('utf-8', 'ignore')
@@ -66,7 +77,7 @@ for line in tweets_file:
         return postTextStrLen
 
     def containsSymbol(tweets_data, symbol):
-        postText = map(lambda tweet: tweet['full_text'], tweets_data)
+        postText = map(lambda tweet: tweet['text'], tweets_data)
         #postTextStr = ''.join(str(i) for i in postText)
         for i in postText:
             postTextStr = i.encode('utf-8', 'ignore')
@@ -79,7 +90,7 @@ for line in tweets_file:
 
     def getNumSymbol(tweets_data, symbol):
         count = 0
-        postText = map(lambda tweet: tweet['full_text'], tweets_data)
+        postText = map(lambda tweet: tweet['text'], tweets_data)
         #postTextStr = ''.join(str(i) for i in postText)
         for i in postText:
             postTextStr = i.encode('utf-8', 'ignore')
@@ -91,7 +102,7 @@ for line in tweets_file:
 
     def getNumUppercaseChars(tweets_data):
         count = 0
-        postText = map(lambda tweet: tweet['full_text'], tweets_data)
+        postText = map(lambda tweet: tweet['text'], tweets_data)
         #postTextStr = ''.join(str(i) for i in postText)
         for i in postText:
             postTextStr = i.encode('utf-8', 'ignore')
@@ -234,7 +245,7 @@ for line in tweets_file:
                 return 0
 
     def numNouns(tweets_data):
-        postText = map(lambda tweet: tweet['full_text'], tweets_data)
+        postText = map(lambda tweet: tweet['text'], tweets_data)
         is_noun = lambda pos: pos[:2] == 'NN' 
         #postTextStr = ''.join(str(i) for i in postText)
         for i in postText:
@@ -248,7 +259,7 @@ for line in tweets_file:
         return countNouns['NN']
 
     def getReadability(tweets_data):
-        postText = map(lambda tweet: tweet['full_text'], tweets_data)
+        postText = map(lambda tweet: tweet['text'], tweets_data)
         #postTextStr = ''.join(str(i) for i in postText)
         for i in postText:
             postTextStr = i.encode('utf-8', 'ignore')
@@ -343,10 +354,10 @@ for line in tweets_file:
     Indegree.append(indegreeval)
     Harmonic.append(harmonicval)
     #print "got Indegree and harmonic", time.time() - start_time
-    AlexaPopularity.append(getAlexaPopularity(externLink))
-    AlexaReach.append(getAlexaReachRank(externLink))
-    AlexaDelta.append(getAlexaDeltaRank(externLink))
-    AlexaCountry.append(getAlexaCountryRank(externLink))
+    AlexaPopularity.append(getAlexaPopularity(expandedLink))
+    AlexaReach.append(getAlexaReachRank(expandedLink))
+    AlexaDelta.append(getAlexaDeltaRank(expandedLink))
+    AlexaCountry.append(getAlexaCountryRank(expandedLink))
     WotValue.append(getWotTrustValue(externLink))
     numberNouns.append(numNouns(tweets_data))    
     readabilityValue.append(getReadability(tweets_data))
@@ -412,5 +423,7 @@ item_df.columns = ['id','tweetTextLen', 'numItemWords', 'questionSymbol', 'excla
           'slangWords','pleasePresent', 'rtCount', 'colonSymbol', 'externLinkPresent','Indegree','Harmonic', 'AlexaPopularity', 'AlexaReach', 'AlexaDelta',
           'AlexaCountry', 'WotValue', 'numberNouns', 'readabilityValue']
 		  
-item_df.to_pickle('TweetItemFeatures.pickle')
-#df = pd.read_pickle('TweetItemFeatures.pickle')
+item_df.to_pickle('TrainingItemFeatures_from_bash_file.pickle')
+df = pd.read_pickle('TrainingItemFeatures_from_bash_file.pickle')
+print "Total Time:", time.time() - start_time
+print df

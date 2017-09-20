@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 import json
 import re
@@ -6,20 +5,44 @@ import emoji
 import requests
 import string
 import urllib, json
-import nltk
-import requests
-import string
 import urllib2
+from bs4 import BeautifulSoup
+from PIL import Image
+from textstat.textstat import textstat
 import datetime as dt
 from datetime import datetime
 from dateutil.parser import parse
 from geopy.geocoders import Nominatim
-from bs4 import BeautifulSoup
-from PIL import Image
+from nltk.tag import pos_tag
+from nltk.tokenize import word_tokenize
+from sklearn.model_selection import train_test_split
+import time
+from langdetect import detect
+import nltk
+from collections import Counter
+import csv
+import pickle
+import pandas as pd
 
-tweets_data_path = 'C:/Users/imaad/twitteradvancedsearch/fake_tweets.json'
+start_time = time.time()
+tweets_data_path = 'C:/Users/imaad/twitteradvancedsearch/fake_real_tweets_training.json'
 tweets_data = []
+ufl_result = []
+tweet_id = [] 
+numFriends = []
+numFollowers = []
+timesListed = []
+followerFriendRatio = []
+hasUrlCheck = []
+userUrl = []
+bioCheck = [] 
+verifiedUser,numFavorites = [],[]
+locationCheck, existingLocationCheck = [],[]
+profileImgCheck, headerImgCheck, accountAge, tweetRatio, mediaContent = [],[],[],[],[]
+indegreeval, harmonicval,AlexaPopularity, AlexaReach, AlexaDelta,AlexaCountry, WotValue  = [],[],[],[],[],[],[]
 tweets_file = open(tweets_data_path, "r")
+Indegree, Harmonic = [],[]
+
 for line in tweets_file:
     try:
         tweet = json.loads(line)
@@ -225,6 +248,16 @@ for line in tweets_file:
                 return True
             else:
                 return False
+            
+    def expandedUrl(shortenedUrl):
+        if shortenedUrl == None:
+            return None
+        expandedUrl = (requests.get(shortenedUrl).url)
+        expandedUrlName = expandedUrl.split("/")[2:3]
+        expandedUrlNameStr = str(expandedUrlName[0])
+        expandedUrlNameStr = expandedUrlNameStr.replace("http://","")
+        expandedUrlNameStr = expandedUrlNameStr.replace("www.", "")
+        return expandedUrlNameStr
 
     def expandUrl(shortenedUrl):
         expandedUrl = (requests.get(shortenedUrl).url)
@@ -346,38 +379,99 @@ for line in tweets_file:
 
         if accountAge != None:
             tweetRatio = (float(numTweets) / float(timeCreatedValue - accountAge) * 86400L)
+            tweetRatio = str(tweetRatio)
             return tweetRatio
         else:
             return 0
-    tweetid = str(getTweetId(tweets_data))
-    numFriends = str(getNumFriends(tweets_data))
-    numFollowers = str(getNumFollowers(tweets_data))
-    timesListed = str(getTimesListed(tweets_data))
-    followerFriendRatio = str(getFollowerFriendRatio(numFollowers, numFriends))
-    hasUrlCheck = str(hasUrl(tweets_data))
-    userUrl = str(getUserUrl(tweets_data))
-    bioCheck = str(hasBio(tweets_data))
-    verifiedUser = str(isVerifiedUser(tweets_data))
+        
+    def getIndegree(tweetsara,externLink, file_name):
+	if externLink == None:
+		return 0
+  	with open(file_name, 'rb') as tsvin:
+		tsvreader = csv.reader(tsvin,delimiter="\t")
+		for row in tsvreader:
+			if expandedLink == row[0]:
+				return row[1]
+				#break
+    
+    
+    print "getting tweet ids", time.time() - start_time
+    tweet_id.append(getTweetId(tweets_data)) 
+    numFriends.append(getNumFriends(tweets_data))
+    numFollowers.append(getNumFollowers(tweets_data))
+    numfriends = getNumFriends(tweets_data)
+    numfollowers = getNumFollowers(tweets_data)
+    timesListed.append(getTimesListed(tweets_data))
+    followerFriendRatio.append(getFollowerFriendRatio(numfollowers, numfriends))
+    hasUrlCheck.append(hasUrl(tweets_data))
+    userUrl.append(getUserUrl(tweets_data))
+    bioCheck.append(hasBio(tweets_data))
+    verifiedUser.append(isVerifiedUser(tweets_data))
     numTweets = getNumTweets(tweets_data)
-    #print numTweets
-    numFavorites = str(getNumFavorites(tweets_data))
-    locationCheck = str(hasLocation(tweets_data))
-    existingLocationCheck = str(hasExistingLocation(tweets_data))
+
+    numFavorites.append(getNumFavorites(tweets_data))
+    locationCheck.append(hasLocation(tweets_data))
+    existingLocationCheck.append(hasExistingLocation(tweets_data))
     externLink = checkForExternalLinks(tweets_data)
     #print externLink
-    alexaPopularity = str(getAlexaPopularity(externLink))
-    alexaReachRank = str(getAlexaReachRank(externLink))
-    alexaDeltaRank = str(getAlexaDeltaRank(externLink))
-    alexaCountryRank = str(getAlexaCountryRank(externLink))
-    wotTrustValue = str(getWotTrustValue(externLink))
-    profileImgCheck = str(hasProfileImg(tweets_data))
-    headerImgCheck = str(hasHeaderImg(tweets_data))
-    accountAge = getAccountAge(tweets_data)
+    profileImgCheck.append(hasProfileImg(tweets_data))
+    headerImgCheck.append(hasHeaderImg(tweets_data))
+    accountAge.append(getAccountAge(tweets_data))
+    accountage = getAccountAge(tweets_data)
     #print accountAge
-    tweetRatio = str(getTweetRatio(tweets_data, accountAge, numTweets))
-    mediaContent = numMediaContent(tweets_data)
-    ufl = [tweetid, numFriends, numFollowers, followerFriendRatio, timesListed, hasUrlCheck, verifiedUser, numTweets, bioCheck,
-          locationCheck, existingLocationCheck, wotTrustValue, mediaContent, accountAge, profileImgCheck, headerImgCheck, tweetRatio,
-          alexaCountryRank, alexaDeltaRank, alexaPopularity, alexaReachRank]
-    #%store (str(ufl)) >> fake_user_tweets_data.txt
-    print ufl
+    tweetRatio.append(getTweetRatio(tweets_data, accountage, numTweets))
+    mediaContent.append(numMediaContent(tweets_data))
+    
+    print "getting Indegree and harmonic", time.time() - start_time
+    externalLink = checkForExternalLinks(tweets_data)
+    expandedLink = expandedUrl(externalLink)
+    #print expandedLink
+    if expandedLink == "twitter.com":
+        expandedLink = None
+    indegreeval = 0
+    indegreeval = getIndegree(tweets_data,expandedLink,"D:/Downloads/hostgraph-indegree.tsv/hostgraph-indegree.tsv")
+    #print indegreeval
+    harmonicval = 0
+    if indegreeval != 0:
+         harmonicval = getIndegree(tweets_data, expandedLink, "D:/Downloads/hostgraph-h.tsv/hostgraph-h.tsv")
+    Indegree.append(indegreeval)
+    #Indegree.append(getIndegree(externLink, "D:/Downloads/hostgraph-indegree.tsv/hostgraph-indegree.tsv"))
+    Harmonic.append(harmonicval)
+    #Harmonic.append(getIndegree(externLink, "D:/Downloads/hostgraph-h.tsv/hostgraph-h.tsv"))
+    print "got Indegree and harmonic", time.time() - start_time
+    AlexaPopularity.append(getAlexaPopularity(expandedLink))
+    AlexaReach.append(getAlexaReachRank(expandedLink))
+    AlexaDelta.append(getAlexaDeltaRank(expandedLink))
+    AlexaCountry.append(getAlexaCountryRank(expandedLink))
+    WotValue.append(getWotTrustValue(externLink))
+    
+
+print "got all values in", time.time() - start_time    
+    
+for i in range(0,len(tweets_data)):
+    ufl = [tweet_id[i], numFriends[i], numFollowers[i], followerFriendRatio[i], timesListed[i], hasUrlCheck[i], verifiedUser[i], 
+           bioCheck[i], locationCheck[i], existingLocationCheck[i], WotValue[i],mediaContent[i], accountAge[i], profileImgCheck[i], headerImgCheck[i], 
+           tweetRatio[i], Indegree[i], Harmonic[i], AlexaCountry[i], AlexaDelta[i], AlexaPopularity[i], AlexaReach[i]]
+    ufl_result.append(ufl)
+    
+user_df = pd.DataFrame(list(ufl_result))
+#item_df
+pd.set_option('display.max_columns', None)
+"""user_df.columns = ['tweetid', 'numFriends', 'numFollowers', 'followerFriendRatio', 'timesListed', 'hasUrlCheck', 'verifiedUser','bioCheck',
+                   'locationCheck', 'existingLocationCheck', 'wotTrustValue', 'mediaContent', 'accountAge', 'profileImgCheck', 'headerImgCheck', 
+                   'tweetRatio', 'Indegree', 'Harmonic','alexaCountryRank', 'alexaDeltaRank', 'alexaPopularity', 'alexaReachRank']
+"""
+user_df.to_pickle('trainingUserFeatures.pickle')
+df3 = pd.read_pickle('trainingUserFeatures.pickle')
+df3.columns = ['tweetid', 'numFriends', 'numFollowers', 'followerFriendRatio', 'timesListed', 'hasUrlCheck', 'verifiedUser','bioCheck',
+                   'locationCheck', 'existingLocationCheck', 'wotTrustValue', 'mediaContent', 'accountAge', 'profileImgCheck', 'headerImgCheck', 
+                   'tweetRatio', 'Indegree', 'Harmonic','alexaCountryRank', 'alexaDeltaRank', 'alexaPopularity', 'alexaReachRank']
+
+df3[['Indegree', 'Harmonic']] = df3[['Indegree','Harmonic']].apply(pd.to_numeric)
+df3['Indegree'].fillna(value='0', inplace = True)
+df3['Harmonic'].fillna(value='0', inplace = True)
+df3.to_pickle('trainingUserFeatures.pickle')
+dfset = pd.read_pickle('trainingUserFeatures.pickle')
+print "My program took", time.time() - start_time, "to run"
+print dfset
+
