@@ -12,6 +12,8 @@ from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler, Normalizer
 #from sklearn import datasets, linear_model, cross_validation, grid_search
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import Imputer
+from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import StratifiedKFold
 import numpy as np
 import pandas as pd
 import time
@@ -42,12 +44,9 @@ def LinearReg(item_df):
 	item_df_new = item_df[['tweetTextLen', 'numItemWords', 'numQuesSymbol', 'numExclamSymbol','numUpperCase',
 						  'numMentions', 'numHashtags' , 'numUrls' , 'positiveWords' , 'negativeWords',
 						  'slangWords', 'rtCount', 'WotValue','numberNouns',  'readabilityValue']]
-  X = item_df[['tweetTextLen', 'numItemWords', 'numQuesSymbol', 'numExclamSymbol','numUpperCase',
-  'numMentions', 'numHashtags' , 'numUrls' , 'positiveWords' , 'negativeWords',
-  'slangWords', 'rtCount', 'WotValue','numberNouns',  'readabilityValue']]
 	
 	lr = LinearRegression()
-	#X = item_df_new
+	X = item_df_new
 	column_names = ['AlexaCountry','AlexaReach', 'AlexaDelta', 'AlexaPopularity', 'Harmonic', 'Indegree']
 	Y = [item_df['AlexaCountry'],item_df['AlexaReach'],item_df['AlexaDelta'],item_df['AlexaPopularity'], item_df['Harmonic'], item_df['Indegree']]
 	for i in range(0, len(Y)):
@@ -61,11 +60,18 @@ def LinearReg(item_df):
 
 def pipeline(item_df):
 	#modelScores = []
-	item_X_train = item_df.values[:,0:31]
-	item_Y_train = item_df.values[:,31]
+    item_X_train = item_df.values[:,0:31]
+    item_Y_train = item_df.values[:,31]
+    #sss = StratifiedShuffleSplit(n_splits=10, test_size=0.1, random_state=0)
+    skf = StratifiedKFold(n_splits=5, random_state=10, shuffle=True)
+    for train_index, val_index in skf.split(item_X_train, item_Y_train):
+        #print("TRAIN:", train_index, "TEST:", test_index)
+        X_train, X_val = item_X_train[train_index], item_X_train[val_index]
+        y_train, y_val = item_Y_train[train_index], item_Y_train[val_index]
+    
 	num_trees = 100
-	rfc = RandomForestClassifier(n_estimators=num_trees, random_state = 84)
-	item_model = rfc.fit(item_X_train, item_Y_train)
+	rfc = RandomForestClassifier(n_estimators=num_trees, random_state = 42)
+	item_model = rfc.fit(X_train, y_train)
 	#scores = cross_val_score(item_model, item_X_train, item_Y_train, cv = 2)
 	#modelScores.append(item_model)
 	#modelScores.append(scores)
@@ -112,6 +118,7 @@ def itemClassification():
 	#item = item.fillna(item.mean())
 	#item = LinearReg(item)
 	item = normalize(item)
+    #item
 
 	item_url_test = "C:/Users/imaad/twitteradvancedsearch/item_features_all_test_1.txt"
 	item_all_test = pd.read_csv(item_url_test, sep=",", header = None, engine='python')
@@ -130,8 +137,7 @@ def itemClassification():
 	item_all_Y_test = item_all_test.values[:,31]
 	
 	for i in range(0,9):
-		
-		item = shuffle(item, random_state=300)
+		item = shuffle(item, random_state=2500)
 		model = pipeline(item)
 		Ms.append(model)
 		#cv_scores.append(model[1])
@@ -184,4 +190,5 @@ def itemClassification():
 		else:
 			finVal.append(a[i][0][0])
 	return (finVal)
-#itemClassification()
+itemClassification()
+print "Time taken:", time.time() - start_time

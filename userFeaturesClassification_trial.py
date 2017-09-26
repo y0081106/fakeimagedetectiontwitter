@@ -11,6 +11,8 @@ from sklearn import preprocessing
 from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler, Normalizer
 #from sklearn import datasets, linear_model, cross_validation, grid_search
 from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import StratifiedKFold
 import numpy as np
 import pandas as pd
 import time
@@ -55,9 +57,14 @@ def normalizeUserFeatures(user_df):
 def pipelineUserFeatures(user_df):
 	user_X_train = user_df.values[:,0:22]
 	user_Y_train = user_df.values[:,22]
+	skf =StratifiedKFold(n_splits=5, random_state=3543, shuffle=True)
+	#sss = StratifiedShuffleSplit(n_splits=10, test_size=0.1, random_state=0)
+	for train_index, val_index in skf.split(user_X_train, user_Y_train):
+            X_train, X_val = user_X_train[train_index], user_X_train[val_index]
+            y_train, y_val = user_Y_train[train_index], user_Y_train[val_index]
 	num_trees = 100
 	rfc = RandomForestClassifier(n_estimators=num_trees, random_state = 84)
-	user_model = rfc.fit(user_X_train, user_Y_train)
+	user_model = rfc.fit(X_train, y_train)
 	#user_scores = cross_val_score(user_model, user_X_train, user_Y_train, cv = 2)
 	return user_model
 	
@@ -100,7 +107,7 @@ def userClassification():
 	user = normalizeUserFeatures(user)
 	
 	for i in range(0,9):
-		user = shuffle(user, random_state=300)
+		user = shuffle(user, random_state=3000)
 		user_model = pipelineUserFeatures(user)
 		userMs.append(user_model)
 	#print userMs
@@ -165,3 +172,5 @@ def userClassification():
 		else:
 			user_finVal.append(user_a[i][0][0])
 	return (user_finVal)
+userClassification()
+print "Time taken:", time.time() - start_time
