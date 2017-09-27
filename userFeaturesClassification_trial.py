@@ -18,32 +18,78 @@ import pandas as pd
 import time
 import pprint
 
+def UserLinearReg(user_df, user_new):
+    user_new_1 = user_new[['numFriends','numFollowers','followerFriendRatio','timesListed','numTweets','wotTrustValue','mediaContent',
+                           'accountAge','tweetRatio']]
+        
+    user_df_1 = user_df[['numFriends','numFollowers','followerFriendRatio','timesListed','numTweets','wotTrustValue','mediaContent',
+                           'accountAge','tweetRatio']]
+    
+    user_lr = LinearRegression()
+    user_X_train = user_new_1
+    user_new_vals = user_df_1
+    user_column_names = ['alexaCountryRank','alexaDeltaRank','alexaPopularity','alexaReachRank', 'Harmonic', 'Indegree']
+    user_Y_train = [user_new['alexaCountryRank'],user_new['alexaReachRank'],user_new['alexaDeltaRank'],user_new['alexaPopularity'],
+         user_new['Harmonic'], user_new['Indegree']]
+    for i in range(0, len(user_Y_train)):
+        linearmodel = user_lr.fit(user_X_train, user_Y_train[i]) 
+        user_df[user_column_names[i]] = user_lr.predict(user_new_vals)
+    return user_df
+	
+def split_dataframe(df, n):
+    """
+    Helper function that splits a DataFrame to a list of DataFrames of size n
 
+    :param df: pd.DataFrame
+    :param n: int
+    :return: list of pd.DataFrame
+    """
+    n = int(n)
+    df_size = len(df)
+    batches = range(0, (df_size/n + 1) * n, n)
+    return [df.iloc[i:i+n] for i in batches if i!=df_size] 
+
+user_url = "C:/Users/imaad/twitteradvancedsearch/user_features_all_1.txt"
+user = pd.read_csv(user_url, sep=",", header = None, engine='python')
+user.columns = ['numFriends', 'numFollowers', 'followerFriendRatio', 'timesListed', 'hasUrlCheck', 'verifiedUser','numTweets', 'bioCheck',
+                'locationCheck', 'existingLocationCheck', 'wotTrustValue', 'mediaContent', 'accountAge', 'profileImgCheck', 'headerImgCheck', 
+                'tweetRatio', 'Indegree', 'Harmonic','alexaCountryRank', 'alexaDeltaRank', 'alexaPopularity', 'alexaReachRank','class']
+user = user.replace("?", "0")
+user_new = user.loc[user['Indegree'] != 0]
+user = UserLinearReg(user, user_new)
+#user = normalizeUserFeatures(user)
+user_fake = user.ix[user['class'] == 'fake']
+user_real = user.ix[user['class'] == 'real']
+#user_fake = shuffle(user_fake, random_state=100)
+#user_real = shuffle(user_real, random_state=100)
+#user_real.array_split(user_real,3)
+user_fake_split = split_dataframe(user_fake, 1065)
+user_real_split = split_dataframe(user_real, 1065)
+
+if len(user_real_split) < 9:
+    for i in range(0, (len(user_real_split))/2) :
+        user_real_split.append(pd.concat([user_real_split[i],user_real_split[i+1]], ignore_index=True))
+for i in range(0, len(user_real_split)):
+    if len(user_real_split[i]) > 1065:
+        user_real_split[i] = shuffle(user_real_split[i], random_state=60)
+        user_real_split[i] = user_real_split[i].iloc[1065:]
+    #print len(user_real_split[i])
+#user_fake_split[0]
+user_split = []
+for i in range(0, len(user_fake_split)):
+    #print len(user_fake_split[i])
+    user_split.append(pd.concat([user_fake_split[8-i],user_real_split[i]]))
+    #print len(user_split[i])
 
 start_time = time.time()
 item_prediction_values = []
 userMs = []
 item_score = []
 prediction_scores = []
-def UserLinearReg(user_df):
-	user_df_new = user_df[['numFriends','numFollowers','followerFriendRatio','timesListed','numTweets','wotTrustValue','mediaContent',
-						   'accountAge','tweetRatio']]
-	
-	user_lr = LinearRegression()
-	user_X = user_df_new
-	user_column_names = ['alexaCountryRank','alexaDeltaRank','alexaPopularity','alexaReachRank', 'Harmonic', 'Indegree']
-	user_Y = [user_df['alexaCountryRank'],user_df['alexaReachRank'],user_df['alexaDeltaRank'],user_df['alexaPopularity'],
-		 user_df['Harmonic'], user_df['Indegree']]
-	for i in range(0, len(user_Y)):
-		linearmodel = user_lr.fit(user_X, user_Y[i]) 
-		user_df_new[user_column_names[i]] = user_lr.predict(user_X)
-	for i in range(0,len(user_column_names)):
-		user_df[user_column_names[i]] = user_df_new[user_column_names[i]]
-	return user_df
-	
+
 #Function that takes item features and normalizes the integer/float values, encodes the string values
 def normalizeUserFeatures(user_df):
-	scaler = MinMaxScaler()
+	scaler = MinMaxScaler(feature_range=(-1, 1))
 	
 	user_df[['numFriends','numFollowers','followerFriendRatio','timesListed','numTweets','wotTrustValue','mediaContent','accountAge',
 			 'tweetRatio','Indegree','Harmonic','alexaCountryRank','alexaDeltaRank','alexaPopularity','alexaReachRank']] = scaler.fit_transform(user_df[['numFriends','numFollowers','followerFriendRatio','timesListed','numTweets','wotTrustValue','mediaContent','accountAge',
@@ -57,14 +103,10 @@ def normalizeUserFeatures(user_df):
 def pipelineUserFeatures(user_df):
 	user_X_train = user_df.values[:,0:22]
 	user_Y_train = user_df.values[:,22]
-	skf =StratifiedKFold(n_splits=5, random_state=3543, shuffle=True)
-	#sss = StratifiedShuffleSplit(n_splits=10, test_size=0.1, random_state=0)
-	for train_index, val_index in skf.split(user_X_train, user_Y_train):
-            X_train, X_val = user_X_train[train_index], user_X_train[val_index]
-            y_train, y_val = user_Y_train[train_index], user_Y_train[val_index]
+	
 	num_trees = 100
-	rfc = RandomForestClassifier(n_estimators=num_trees, random_state = 84)
-	user_model = rfc.fit(X_train, y_train)
+	rfc = RandomForestClassifier(n_estimators=num_trees)
+	user_model = rfc.fit(user_X_train, user_Y_train)
 	#user_scores = cross_val_score(user_model, user_X_train, user_Y_train, cv = 2)
 	return user_model
 	
@@ -95,23 +137,12 @@ class MultiColumnLabelEncoder:
 		return self.fit(X,y).transform(X)
 
 		
+for i in range(0,9):
+    user_split[i] = normalizeUserFeatures(user_split[i])
+    user_model = pipelineUserFeatures(user_split[i])
+    userMs.append(user_model)
+#print userMs
 def userClassification():
-	user_url = "C:/Users/imaad/twitteradvancedsearch/user_features_all_1.txt"
-	user = pd.read_csv(user_url, sep=",", header = None, engine='python')
-	user.columns = ['numFriends', 'numFollowers', 'followerFriendRatio', 'timesListed', 'hasUrlCheck', 'verifiedUser','numTweets', 'bioCheck',
-					'locationCheck', 'existingLocationCheck', 'wotTrustValue', 'mediaContent', 'accountAge', 'profileImgCheck', 'headerImgCheck', 
-					'tweetRatio', 'Indegree', 'Harmonic','alexaCountryRank', 'alexaDeltaRank', 'alexaPopularity', 'alexaReachRank','class']
-	user = user.replace('?',0)
-	#user = user.fillna(user.mean())
-	#user = UserLinearReg(user)
-	user = normalizeUserFeatures(user)
-	
-	for i in range(0,9):
-		user = shuffle(user, random_state=3000)
-		user_model = pipelineUserFeatures(user)
-		userMs.append(user_model)
-	#print userMs
-
 	user_url_test = "C:/Users/imaad/twitteradvancedsearch/user_features_all_test_1.txt"
 	user_all_test = pd.read_csv(user_url_test, sep=",", header = None, engine='python')
 	user_all_test.columns = ['numFriends', 'numFollowers', 'followerFriendRatio', 'timesListed', 'hasUrlCheck', 'verifiedUser','numTweets', 'bioCheck',
@@ -120,6 +151,7 @@ def userClassification():
 	user_all_test = user_all_test.replace("?", 0)
 	#user_all_test = user_all_test.fillna(user_all_test.mean())
 	#user_all_test = UserLinearReg(user_all_test)
+	user_all_test = UserLinearReg(user_all_test, user_new)
 	user_all_test = normalizeUserFeatures(user_all_test)
 	user_all_X_test = user_all_test.values[:,0:22]
 	user_all_Y_test = user_all_test.values[:,22]
@@ -128,12 +160,36 @@ def userClassification():
 
 	predscore_item = []
 	prediction_values1, user_prediction_values, user_testing_val = [],[], []
-	for m in userMs:
-		user_all_predval = m.predict(user_all_test.values[:,0:22])
-		user_testing_val.append(user_all_test.values[:,22])
+	user_score = []
+	for m in userMs:    
+		user_all_predval = m.predict(user_all_X_test)
+		user_predscore = m.predict_proba(user_all_X_test)
+		user_testing_val.append(user_all_Y_test)
 		user_prediction_values.append(user_all_predval)
-		
+		user_score.append(user_predscore)
 
+	#print user_prediction_values
+	#print user_score
+	prediction_val = []
+	user_combined_val = []
+	abc1 = []
+	for i in range(0,len(userMs)):
+			column = []
+			for j in range(0,len(user_all_Y_test)):
+					if (user_score[i][j][0]) > (user_score[i][j][1]):
+						column.append(user_score[i][j][0])
+					else:
+						column.append(user_score[i][j][1])
+			prediction_val.append(column)
+
+	for i in range(0,len(userMs)):
+			column1 = []
+			for j in range(0,len(user_all_Y_test)):
+				abc1 = user_prediction_values[i][j], user_testing_val[i][j], user_prediction_values[i][j]
+				column1.append(abc1)
+			user_combined_val.append(column1)
+	   
+	#print (user_combined_val)
 	prediction_val = []
 	user_combined_val = []
 	cde = []
@@ -144,7 +200,7 @@ def userClassification():
 			cde = user_prediction_values[i][j], user_testing_val[i][j]
 			user_column.append(cde)
 		user_combined_val.append(user_column)
-				
+
 	#print(user_combined_val)
 
 	user_cd = []
@@ -172,5 +228,5 @@ def userClassification():
 		else:
 			user_finVal.append(user_a[i][0][0])
 	return (user_finVal)
-userClassification()
+
 print "Time taken:", time.time() - start_time
