@@ -472,6 +472,6 @@ df3['Indegree'].fillna(value='0', inplace = True)
 df3['Harmonic'].fillna(value='0', inplace = True)
 df3.to_pickle('trainingUserFeatures.pickle')
 dfset = pd.read_pickle('trainingUserFeatures.pickle')
-print "My program took", time.time() - start_time, "to run"
-print dfset
+#print "My program took", time.time() - start_time, "to run"
+#print dfset
 

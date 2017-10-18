@@ -9,158 +9,111 @@ from sklearn.utils import shuffle
 from sklearn import preprocessing
 from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler, Normalizer
 from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
 import pandas as pd
 import time
 import pprint
-from userFeaturesClassification_trial import userClassification
-from itemFeaturesClassification_trial import itemClassification
-from itemFeaturesClassification_trial import split_dataframe
-from itemFeaturesClassification_trial import LinearReg
+from sklearn.metrics import f1_score
+from userFeaturesClassification import userClassification
+from itemFeaturesClassification import itemClassification
+from itemFeaturesClassification import split_dataframe
+from itemFeaturesClassification import LinearReg
+from itemFeaturesClassification import item_testing_data
 start_time = time.time()
 finVal = itemClassification()
-#print finval
 user_finVal = userClassification()
 agreedVal = []
 disagreedVal = []
-for i in range(0, len(finVal)):
-    if finVal[i] == user_finVal[i]:
-        agreedVal.append(finVal[i])
-        #agcount =agcount+1
-    else:
-        agreedVal.append("disagreed")
-#print agreedVal
+for i in range(len(finVal)):
+    column = []
+    for j in range(len(finVal[i])):
+        if finVal[i][j] == user_finVal[i][j]:
+            column.append(finVal[i][j])
+        else:
+            column.append("disagreed")
+    agreedVal.append(column)
 
-class MultiColumnLabelEncoder:
-	def __init__(self,columns = None):
-		self.columns = columns # array of column names to encode
-
-	def fit(self,X,y=None):
-		return self # not relevant here
-
-	def transform(self,X):
-		'''
-		Transforms columns of X specified in self.columns using
-		LabelEncoder(). If no columns specified, transforms all
-		columns in X.
-		'''
-		output = X.copy()
-		if self.columns is not None:
-			for col in self.columns:
-				output[col] = LabelEncoder().fit_transform(output[col])
-		else:
-			for colname,col in output.iteritems():
-				output[colname] = LabelEncoder().fit_transform(col)
-		return output
-
-	def fit_transform(self,X,y=None):
-		return self.fit(X,y).transform(X)
-
-
-def normalize(item_df):
-	scaler = MinMaxScaler(feature_range=(-1, 1))
-	item_df[['tweetTextLen', 'numItemWords', 'numQuesSymbol', 'numExclamSymbol','numUpperCase', 'numMentions', 'numHashtags', 'numUrls', 'positiveWords', 'negativeWords',
-			  'slangWords','rtCount','Indegree','Harmonic', 'AlexaPopularity', 'AlexaReach', 'AlexaDelta',
-			  'AlexaCountry', 'WotValue', 'numberNouns', 'readabilityValue']] = scaler.fit_transform(item_df[['tweetTextLen', 'numItemWords', 'numQuesSymbol', 'numExclamSymbol','numUpperCase', 'numMentions', 'numHashtags', 'numUrls', 'positiveWords', 'negativeWords',
-			  'slangWords','rtCount','Indegree','Harmonic','AlexaPopularity', 'AlexaReach', 'AlexaDelta',
-			  'AlexaCountry', 'WotValue', 'numberNouns', 'readabilityValue']])
-	item_df = MultiColumnLabelEncoder(columns = ['questionSymbol','exclamSymbol','externLinkPresent','happyEmo', 'sadEmo', 'containFirstPron',
-											'containSecPron', 'containThirdPron','colonSymbol','pleasePresent' ]).fit_transform(item_df)
-	return item_df
-item_url = "C:/Users/imaad/twitteradvancedsearch/item_features_all_1.txt"
-item = pd.read_csv(item_url, sep=",", header = None, engine='python')
-item.columns = ['tweetTextLen', 'numItemWords', 'questionSymbol', 'exclamSymbol', 'externLinkPresent','numberNouns', 'happyEmo',
-          'sadEmo', 'containFirstPron','containSecPron','containThirdPron','numUpperCase', 'positiveWords', 'negativeWords', 
-                   'numMentions', 'numHashtags', 'numUrls','rtCount' ,
-                'slangWords','colonSymbol','pleasePresent' ,'WotValue', 'numQuesSymbol','numExclamSymbol', 'readabilityValue','Indegree',
-                   'Harmonic' ,'AlexaCountry','AlexaDelta','AlexaPopularity', 'AlexaReach' , 'class']
-
-item = item.replace('?', 0)
-item_new = item.loc[item['AlexaCountry'] != 0]
-item = LinearReg(item, item_new)
-item_fake = item.ix[item['class'] == 'fake']
-item_real = item.ix[item['class'] == 'real']
-#item_fake = shuffle(item_fake, random_state=70)
-#item_real = shuffle(item_real, random_state=70)
-#item_real.array_split(item_real,3)
-item_fake_split = split_dataframe(item_fake, 1065)
-item_real_split = split_dataframe(item_real, 1065)
-
-if len(item_real_split) < 9:
-    for i in range(0, (len(item_real_split))/2) :
-        item_real_split.append(pd.concat([item_real_split[i],item_real_split[i+1]], ignore_index=True))
-for i in range(0, len(item_real_split)):
-    if len(item_real_split[i]) > 1065:
-        item_real_split[i] = shuffle(item_real_split[i], random_state=100)
-        item_real_split[i] = item_real_split[i].iloc[1065:]
-    #print len(item_real_split[i])
-#item_fake_split[0]
-item_split = []
-for i in range(0, len(item_fake_split)):
-    #print len(item_fake_split[i])
-    item_split.append(pd.concat([item_fake_split[i],item_real_split[8-i]]))
-    #print len(item_split[i])
+for j in range(len(item_testing_data)):
+    item_testing_data[j] = item_testing_data[j].set_index(np.array([i for i in agreedVal[j]]))
 	
-item_url_test = "C:/Users/imaad/twitteradvancedsearch/item_features_all_test_1.txt"
-item_all_test = pd.read_csv(item_url_test, sep=",", header = None, engine='python')
-item_all_test.columns = ['tweetTextLen', 'numItemWords', 'questionSymbol', 'exclamSymbol', 'externLinkPresent','numberNouns', 'happyEmo',
-		  'sadEmo', 'containFirstPron','containSecPron','containThirdPron','numUpperCase', 'positiveWords', 'negativeWords', 
-				   'numMentions', 'numHashtags', 'numUrls','rtCount' ,
-				'slangWords','colonSymbol','pleasePresent' ,'WotValue', 'numQuesSymbol','numExclamSymbol', 'readabilityValue','Indegree',
-				   'Harmonic' ,'AlexaCountry','AlexaDelta','AlexaPopularity', 'AlexaReach' , 'class']
-#item_all_test = item_all_test.replace("?", "0")
-item_all_test = item_all_test.replace("?", 0)
-# fill missing values with mean column values
-#item_all_test = item_all_test.fillna(item_all_test.mean())
-item_all_test = LinearReg(item_all_test, item_new)
-item_all_test = normalize(item_all_test)
+from collections import Counter
+disagreed_dfs = []
+for i in range(len(item_testing_data)):
+    disagreed_dfs.append(item_testing_data[i].loc[['disagreed']])
+#print len(disagreed_dfs)
+agreed_dfs = []
 
-retrain_set , retest_set =[],[]
-for i in range(0, len(finVal)):
-    if agreedVal[i] != "disagreed":
-        retrain_set.append(item_all_test.values[i])
-        
-    if agreedVal[i] == "disagreed":
-        retest_set.append(item_all_test.values[i])
-        
-retrain_df = pd.DataFrame(retrain_set)
-retest_df = pd.DataFrame(retest_set)
-retrain_df.columns = ['tweetTextLen', 'numItemWords', 'questionSymbol', 'exclamSymbol', 'externLinkPresent','numberNouns', 'happyEmo',
-          'sadEmo', 'containFirstPron','containSecPron','containThirdPron','numUpperCase', 'positiveWords', 'negativeWords', 
-                   'numMentions', 'numHashtags', 'numUrls','rtCount' ,
-                'slangWords','colonSymbol','pleasePresent' ,'WotValue', 'numQuesSymbol','numExclamSymbol', 'readabilityValue','Indegree',
-                   'Harmonic' ,'AlexaCountry','AlexaDelta','AlexaPopularity', 'AlexaReach' , 'class']
-retrain_df = LinearReg(retrain_df, item_new)
-retrain_df = normalize(retrain_df)
-#Concatenating data from previous training set and agreed set
-for i in range(0, len(item_split)):
-    dataframes =[item_split[i], retrain_df]
-totalTrainingSet = pd.concat(dataframes)
-totalTrainingSet = LinearReg(totalTrainingSet, item_new)
-totalTrainingSet = normalize(totalTrainingSet)
+for i in range(0, len(item_testing_data)):
+    count_index = Counter(item_testing_data[i].index)
+    if 'real' in count_index.keys():
+        fake_df = item_testing_data[i].loc[['fake']]
+        real_df = item_testing_data[i].loc[['real']]
+        agreed_dfs.append(pd.concat([fake_df, real_df]))
+    else:
+        agreed_dfs.append(item_testing_data[i].loc[['fake']])
+    
 
-def retrainPipeline(df):
-    X_retrain = df.values[:,0:31]
-    Y_retrain = df.values[:,31]
-    num_trees = 100
-    rfc = RandomForestClassifier(n_estimators=num_trees, random_state = 0)
-    retrain_model = rfc.fit(X_retrain, Y_retrain)
-    return retrain_model
+for i in range(0,len(item_testing_data)):
+    print len(agreed_dfs[i])
+    print len(disagreed_dfs[i])
+    count_index = Counter(item_testing_data[i].index)
+    print count_index
+	
 
-#totalTrainingSet = shuffle(totalTrainingSet, random_state=20)
-retrain_model = retrainPipeline(totalTrainingSet)
+	
 repredict = []
-retest_X = retest_df.values[:,0:31]
-retest_Y = retest_df.values[:,31]
-repredict.append(retrain_model.predict(retest_X))
-#print repredict
-#print agreedVal
-j=0
-for i in range(0, len(finVal)):
-	if agreedVal[i] == "disagreed":
-		agreedVal[i] =repredict[0][j]
-		j = j + 1
-print agreedVal
-print "Time taken:", time.time() - start_time
-#print retest_Y
+retest_df = []
+retest_X = []
+retest_Y = []
+for i in range(0, len(disagreed_dfs)):
+    retest_df.append(disagreed_dfs[i])
+    retest_X.append(retest_df[i].values[:,0:31])
+    retest_Y.append(retest_df[i].values[:,31])
+
+for i in range(len(disagreed_dfs)):
+    repredict.append(retrain_model.predict(retest_X[i]))
+
+	
+for i in range(len(agreedVal)):
+    k = 0
+    for j in range(len(agreedVal[i])):
+        if agreedVal[i][j] == 'disagreed':
+            agreedVal[i][j] = repredict[i][k]
+            k = k + 1
+			
+acc_scores=[]
+
+def calc_accuracy(fin_val):
+    for i in range(0,len(fin_val)):
+        acc_scores.append(accuracy_score(item_Y_test[i], agreedVal[i]))
+    return acc_scores
+acc = calc_accuracy(agreedVal)
+print acc
+def calc_fake_accuracy(agreedVal):
+	accuracy_val_fake = []
+	cmat_total = []
+	cmat_val = []
+	for i in range(len(agreedVal)):
+		y_true = item_Y_test[i]
+		y_pred = agreedVal[i]
+		cmat = confusion_matrix(y_true,y_pred)
+		print cmat
+		cmat_val.append(cmat[0][0])
+		if len(cmat[0]>1):
+			cmat_sum = 0
+			for i in range(len(cmat)):
+				cmat_sum = cmat_sum + cmat[0][i]
+			cmat_total.append(cmat_sum)
+		else:
+			cmat_total.append(cmat[0])   
+	#print cmat_val
+	#print cmat_total
+	for i in range(len(cmat_val)):
+		accr = float(cmat_val[i])/cmat_total[i]
+		accuracy_val_fake.append(float(accr))
+	print accuracy_val_fake
+	avg = sum(accuracy_val_fake)/len(accuracy_val_fake)
+	print avg
+
