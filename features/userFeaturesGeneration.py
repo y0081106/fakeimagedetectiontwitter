@@ -1,28 +1,30 @@
 import numpy as np
 import json
 import re
-import emoji
 import requests
 import string
 import urllib, json
 import urllib2
+import time
+import csv
+import nltk
+import pickle
+import pandas as pd
+import emoji
+import datetime as dt
+
 from bs4 import BeautifulSoup
 from PIL import Image
 from textstat.textstat import textstat
-import datetime as dt
 from datetime import datetime
 from dateutil.parser import parse
 from geopy.geocoders import Nominatim
 from nltk.tag import pos_tag
 from nltk.tokenize import word_tokenize
-from sklearn.model_selection import train_test_split
-import time
 from langdetect import detect
-import nltk
 from collections import Counter
-import csv
-import pickle
-import pandas as pd
+
+
 
 start_time = time.time()
 tweets_data_path = 'C:/Users/imaad/twitteradvancedsearch/fake_real_tweets_training.json'

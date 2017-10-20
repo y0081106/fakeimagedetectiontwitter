@@ -16,7 +16,6 @@ from PIL import Image
 from textstat.textstat import textstat
 from nltk.tag import pos_tag
 from nltk.tokenize import word_tokenize
-from sklearn.model_selection import train_test_split
 from langdetect import detect
 from collections import Counter
 
@@ -24,73 +23,30 @@ from collections import Counter
 F_HARMONIC = "D:/Downloads/hostgraph-h.tsv/hostgraph-h.tsv"
 F_INDEGREE = "D:/Downloads/hostgraph-indegree.tsv/hostgraph-indegree.tsv"
 
-pleasePresent = findPatternTrueFalse("C:/Users/imaad/twitteradvancedsearch/senti_words/please.txt")
-happyEmo = findPatternTrueFalse("C:/Users/imaad/twitteradvancedsearch/emoticons/happy-emoticons.txt")
-sadEmo = findPatternTrueFalse("C:/Users/imaad/twitteradvancedsearch/emoticons/sad-emoticons.txt")
-containFirstPron = findPatternTrueFalse("C:/Users/imaad/twitteradvancedsearch/pronouns/first-order-prons.txt")
-containSecPron = findPatternTrueFalse("C:/Users/imaad/twitteradvancedsearch/pronouns/second-order-prons.txt")
-containThirdPron = findPatternTrueFalse("C:/Users/imaad/twitteradvancedsearch/pronouns/third-order-prons.txt")
-slangWords = findPatternCount("C:/Users/imaad/twitteradvancedsearch/slang_words/slangwords.txt")
-negativeWords = findPatternCount("C:/Users/imaad/twitteradvancedsearch/senti_words/negative-words.txt")
-positiveWords = findPatternCount("C:/Users/imaad/twitteradvancedsearch/senti_words/positive-words.txt")
+F_PLEASE = "C:/Users/imaad/twitteradvancedsearch/senti_words/please.txt"
+F_HAPPYEMO = "C:/Users/imaad/twitteradvancedsearch/emoticons/happy-emoticons.txt"
+F_SADEMO = "C:/Users/imaad/twitteradvancedsearch/emoticons/sad-emoticons.txt"
+F_FIRSTPRON = "C:/Users/imaad/twitteradvancedsearch/pronouns/first-order-prons.txt"
+F_SECONDPRON = "C:/Users/imaad/twitteradvancedsearch/pronouns/second-order-prons.txt"
+F_THIRDPRON = "C:/Users/imaad/twitteradvancedsearch/pronouns/third-order-prons.txt"
+F_SLANG = "C:/Users/imaad/twitteradvancedsearch/slang_words/slangwords.txt"
+F_NEGATIVE = "C:/Users/imaad/twitteradvancedsearch/senti_words/negative-words.txt"
+F_POSITIVE = "C:/Users/imaad/twitteradvancedsearch/senti_words/positive-words.txt"
 
 
-PATTERN_PLEASE = read_pattern(fplease)
-PATTERN_HAPPYEMO = read_pattern(fhappyEmo)
-PATTERN_SADEMO  = read_pattern(fsadEmo)
-PATTERN_FIRSTPRON = read_pattern(ffirstpron)
-PATTERN_SECPRON = read_pattern(fsecondpron)
-PATTERN_THIRDPRON = read_pattern(fthirdpron)
-PATTERN_SLANG = read_pattern(fslang)
-PATTERN_NEGATIVE = read_pattern(fneg)
-PATTERN_POSITIVE = read_pattern(fpos)
+PATTERN_PLEASE = read_pattern(F_PLEASE)
+PATTERN_HAPPYEMO = read_pattern(F_HAPPYEMO)
+PATTERN_SADEMO  = read_pattern(F_SADEMO)
+PATTERN_FIRSTPRON = read_pattern(F_FIRSTPRON)
+PATTERN_SECPRON = read_pattern(F_SECONDPRON)
+PATTERN_THIRDPRON = read_pattern(F_THIRDPRON)
+PATTERN_SLANG = read_pattern(F_SLANG)
+PATTERN_NEGATIVE = read_pattern(F_NEGATIVE)
+PATTERN_POSITIVE = read_pattern(F_POSITIVE)
 
-
-def getTweetId(tweets_data):
-    twId = map(lambda tweet: tweet['id_str'], tweets_data)
-    for i in twId:
-        twIdStr = i.encode('utf-8', 'ignore')
-    #postTextStr = ''.join(str(i) for i in postText)
-    return twIdStr
-
-def getText(tweets_data):
-    postText = map(lambda tweet: tweet['text'], tweets_data)
-    for i in postText:
-        postTextStr = i.encode('utf-8', 'ignore')
-    #postTextStr = ''.join(str(i) for i in postText)
-    return postTextStr
-
-def getTextLen(tweets_data):
-    postText = map(lambda tweet: tweet['text'], tweets_data)
-    for i in postText:
-        postTextStr = i.encode('utf-8', 'ignore')
-    #postTextStr = ''.join(str(i) for i in postText)
-    return len(postTextStr)
-
-def getNumItemWords(tweets_data):
-    postText = map(lambda tweet: tweet['text'], tweets_data )
-    #postTextStr = ''.join(str(i) for i in postText)
-    for i in postText:
-        postTextStr = i.encode('utf-8', 'ignore')
-    postTextStrLen= len(postTextStr.split())
-    return postTextStrLen
-
-def getNumSymbol(tweets_data, symbol):
+def getNumUppercaseChars(tweet):
     count = 0
-    postText = map(lambda tweet: tweet['text'], tweets_data)
-    #postTextStr = ''.join(str(i) for i in postText)
-    for i in postText:
-        postTextStr = i.encode('utf-8', 'ignore')
-    postTextStr =  re.sub(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+','', postTextStr)
-    for i in postTextStr.strip():
-        if i == symbol:
-            count = count + 1
-    return count
-
-def getNumUppercaseChars(tweets_data):
-    count = 0
-    postText = map(lambda tweet: tweet['text'], tweets_data)
-    #postTextStr = ''.join(str(i) for i in postText)
+    postText = tweet['text']
     for i in postText:
         postTextStr = i.encode('utf-8', 'ignore')
     postTextStr =  re.sub(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+','', postTextStr) # URLs
@@ -102,13 +58,6 @@ def getNumUppercaseChars(tweets_data):
             count = count+1
     return count
 
-def getNumHashtags(tweets_data):
-    numHashtags = map(lambda tweet: tweet['entities']['hashtags'] if tweet['entities'] != None else None, tweets_data)
-    hashtags = []
-    if len(numHashtags) > 0:
-        hashtags.extend(tweet['entities']['hashtags'])
-        tweet['hashtags'] = [tag['text'] for tag in hashtags]
-    return len(tweet['hashtags'])
 
 def getNumUrls(tweets_data):
     #numUrls1 = map(lambda tweet: tweet['entities']['urls'] if tweet['entities'] != None else None, tweets_data)
@@ -131,15 +80,6 @@ def getNumUrls(tweets_data):
     else:
         totalurl = len(tweet['url1'])
     return totalurl
-
-def getRetweetsCount(tweets_data):
-    if 'retweet_count' in tweet:
-        numRetweets= map(lambda tweet: tweet['retweet_count'], tweets_data)
-        for i in numRetweets:
-            numRetweetsStr = str(i).encode('utf-8', 'ignore')
-        return numRetweetsStr
-    else:
-        return 0
 
 def get_alexa_metrics(domain):
     metrics = (0, 0, 0 ,0)
@@ -200,11 +140,6 @@ def numNouns(postText):
         nouns = [word for (word, pos) in nltk.pos_tag(tokenized) if is_noun(pos)]
     countNouns = Counter([j for i,j in pos_tag(word_tokenize(postTextStr))])
     return countNouns['NN']
-
-def getReadability(postText):
-    #postTextStr = ''.join(str(i) for i in postText)
-    readability = textstat.flesch_reading_ease(str(postTextStr))
-    return readability
 
 def isAnImage(url):
     text = 'pbs.twimg.com'
@@ -328,7 +263,7 @@ def gen_features(tweet):
     exclamSymbol = '!' in counts
     numQuesSymbol = counts.get('?', 0)
     numExclamSymbol = counts.get('!', 0)
-    numUpperCase = getNumUppercaseChars(tweets_data)
+    numUpperCase = getNumUppercaseChars(tweet)
     numMentions = len(tweet['entities'].get('user_mentions', []))
     numHashtags = len(tweet['entities'].get('user_hashtags', []))
     numUrls = len(tweet['entities'].get('urls', [])) + len(tweet['entities'].get('media', []))
@@ -343,15 +278,18 @@ def gen_features(tweet):
     harmonic = getHarmonic(indegree, expandedLink)
     alexa_metrics = get_alexa_metrics(expandedLink)
 
-    WotValue = getWotTrustValue(externLink)
+    WotValue = getWotTrustValue(externalLink)
     numberNouns = numNouns(ttext)
     readabilityValue = textstat.flesch_reading_ease(str(postTextStr))
 
     please_exists, _ = pattern_count(ttext, PATTERN_PLEASE)
     containsFirstPron, _ = pattern_count(ttext, PATTERN_FIRSTPRON)
+	containsSecPron, _ = pattern_count(ttext, PATTERN_SECPRON)
+	containsThirdPron, _ = pattern_count(ttext, PATTERN_THIRDPRON)
     _, slangWords = pattern_count(ttext, PATTERN_SLANG)
-    containFirstPron = pattern_count(ttext, PATTERN_FIRSTPRON)
-
+	_, negWords = pattern_count(ttext, PATTERN_NEGATIVE)
+	_, posWords = pattern_count(ttext, PATTERN_POSITIVE)
+	
     features = (tid,
                 ttext,
                 tlength,
@@ -391,7 +329,6 @@ def main():
             tweet = json.loads(line)
             tweet_features = gen_features(tweet)
             print(tweet_features)
-
 
 if __name__ == '__main_':
     main()
