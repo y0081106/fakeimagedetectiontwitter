@@ -8,6 +8,7 @@ import urllib2
 import time
 import nltk
 import csv
+import sys
 import pickle
 import pandas as pd
 
@@ -33,17 +34,6 @@ F_SLANG = "C:/Users/imaad/twitteradvancedsearch/slang_words/slangwords.txt"
 F_NEGATIVE = "C:/Users/imaad/twitteradvancedsearch/senti_words/negative-words.txt"
 F_POSITIVE = "C:/Users/imaad/twitteradvancedsearch/senti_words/positive-words.txt"
 
-
-PATTERN_PLEASE = read_pattern(F_PLEASE)
-PATTERN_HAPPYEMO = read_pattern(F_HAPPYEMO)
-PATTERN_SADEMO  = read_pattern(F_SADEMO)
-PATTERN_FIRSTPRON = read_pattern(F_FIRSTPRON)
-PATTERN_SECPRON = read_pattern(F_SECONDPRON)
-PATTERN_THIRDPRON = read_pattern(F_THIRDPRON)
-PATTERN_SLANG = read_pattern(F_SLANG)
-PATTERN_NEGATIVE = read_pattern(F_NEGATIVE)
-PATTERN_POSITIVE = read_pattern(F_POSITIVE)
-
 def getNumUppercaseChars(tweet):
     count = 0
     postText = tweet['text']
@@ -52,7 +42,6 @@ def getNumUppercaseChars(tweet):
     postTextStr =  re.sub(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+','', postTextStr) # URLs
     postTextStr =  re.sub(r'(?:\#+[\w_]+[\w\'_\-]*[\w_]+)','', postTextStr) # remove hash-tags
     postTextStr =  re.sub(r'(?:@[\w_]+)','', postTextStr) # remove @-mentions
-    #print postTextStr
     for i in postTextStr:
         if i.isupper():
             count = count+1
@@ -60,11 +49,8 @@ def getNumUppercaseChars(tweet):
 
 
 def getNumUrls(tweets_data):
-    #numUrls1 = map(lambda tweet: tweet['entities']['urls'] if tweet['entities'] != None else None, tweets_data)
     numUrls1 = [tweet.get('entities''urls','') for tweet in tweets_data]
-
     numurls1 = []
-
     if len(numUrls1) > 0:
         #numurls1.extend(tweet.get('entities''media',''))
         numurls1.extend(tweet['entities']['urls'])
@@ -104,8 +90,7 @@ def hasExternalLinks(tweets_data):
         else:
             return False
 
-def getWotTrustValue(expandedUrlName):
-    #print expandUrlName
+def getWotTrustValue(expandUrlName):
     if "/" in expandUrlName:
         expandUrlName1 = expandUrlName.split("/")[2:3]
     else:
@@ -128,9 +113,7 @@ def getWotTrustValue(expandedUrlName):
             return 0
 
 def numNouns(postText):
-    postText = map(lambda tweet: tweet['text'], tweets_data)
     is_noun = lambda pos: pos[:2] == 'NN'
-    #postTextStr = ''.join(str(i) for i in postText)
     for i in postText:
         postTextStr = i.encode('utf-8', 'ignore')
     #postTextStr = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)"," ",postTextStr).split())
@@ -152,7 +135,7 @@ def isAnImage(url):
             return True
         else:
             return False
-    except IOError:
+    except AttributeError, IOError:
         return False
 
 def expandedUrl(shortenedUrl):
@@ -165,14 +148,14 @@ def expandedUrl(shortenedUrl):
         expandedUrlNameStr = expandedUrlNameStr.replace("http://","")
         expandedUrlNameStr = expandedUrlNameStr.replace("www.", "")
     except requests.exceptions.ConnectionError as e:
-        print e
+        #print e
         expandedUrlNameStr = None
     return expandedUrlNameStr
 
-def checkForExternalLinks(tweets_data):
+def checkForExternalLinks(tweet):
     numurls1 = []
     urlList = []
-    numUrls1 = map(lambda tweet: tweet['entities']['urls'] if tweet['entities'] != None else None, tweets_data)
+    numUrls1 = tweet['entities']['urls'] 
     if len(numUrls1) > 0:
         numurls1.extend(tweet['entities']['urls'])
         tweet['url1'] = [numurl['url'] for numurl in numurls1]
@@ -180,11 +163,11 @@ def checkForExternalLinks(tweets_data):
         urlList.extend(tweet['url1'])
     #print urlList
     for ural in urlList:
-        checkForImage = isAnImage(ural)
-        if  not checkForImage:
-            return ural
-        else:
-            return None
+		checkForImage = isAnImage(ural)
+		if  not checkForImage:
+			return ural
+		else:
+			return None
 
 def getIndegree(expandedLink, fin=F_INDEGREE):
     #print expandedLink
@@ -192,7 +175,7 @@ def getIndegree(expandedLink, fin=F_INDEGREE):
         expandedLink = None
     indegreeval = None
 
-    if externLink == None:
+    if expandedLink == None:
     	return 0
     with open(fin, 'rb') as tsvin:
     	tsvreader = csv.reader(tsvin,delimiter="\t")
@@ -219,6 +202,15 @@ def pattern_count(ttext, pattern):
         count += len(matches)
     return count > 0, count
 
+PATTERN_PLEASE = read_pattern(F_PLEASE)
+PATTERN_HAPPYEMO = read_pattern(F_HAPPYEMO)
+PATTERN_SADEMO  = read_pattern(F_SADEMO)
+PATTERN_FIRSTPRON = read_pattern(F_FIRSTPRON)
+PATTERN_SECPRON = read_pattern(F_SECONDPRON)
+PATTERN_THIRDPRON = read_pattern(F_THIRDPRON)
+PATTERN_SLANG = read_pattern(F_SLANG)
+PATTERN_NEGATIVE = read_pattern(F_NEGATIVE)
+PATTERN_POSITIVE = read_pattern(F_POSITIVE)
 
 header = ('id',
           'tweetTextLen',
@@ -254,65 +246,70 @@ header = ('id',
           'readabilityValue')
 
 def gen_features(tweet):
-    tid = tweet['id_str']
-    ttext = tweet['text']
-    tlength = len(ttext)
-    twords = len(ttext.split())
-    counts = Counter(ttext)
-    questionSymbol = '?' in counts
-    exclamSymbol = '!' in counts
-    numQuesSymbol = counts.get('?', 0)
-    numExclamSymbol = counts.get('!', 0)
-    numUpperCase = getNumUppercaseChars(tweet)
-    numMentions = len(tweet['entities'].get('user_mentions', []))
-    numHashtags = len(tweet['entities'].get('user_hashtags', []))
-    numUrls = len(tweet['entities'].get('urls', [])) + len(tweet['entities'].get('media', []))
-    rtCount = tweet.get('retweet_count', 0)
-    colonSymbol = ':' in counts
-    externLinkPresent = len(tweet['entities'].get('urls', [])) > 0
-
-    externalLink = checkForExternalLinks(tweets_data)
-    expandedLink = expandedUrl(externalLink)
-
-    indegree = getIndegree(expandedLink)
-    harmonic = getHarmonic(indegree, expandedLink)
-    alexa_metrics = get_alexa_metrics(expandedLink)
-
-    WotValue = getWotTrustValue(externalLink)
-    numberNouns = numNouns(ttext)
-    readabilityValue = textstat.flesch_reading_ease(str(postTextStr))
-
-    please_exists, _ = pattern_count(ttext, PATTERN_PLEASE)
-    containsFirstPron, _ = pattern_count(ttext, PATTERN_FIRSTPRON)
+	print "Hello"
+	tid = tweet['id_str']
+	ttext = tweet['text']
+	tlength = len(ttext)
+	twords = len(ttext.split())
+	counts = Counter(ttext)
+	questionSymbol = '?' in counts
+	exclamSymbol = '!' in counts
+	numQuesSymbol = counts.get('?', 0)
+	numExclamSymbol = counts.get('!', 0)
+	numUpperCase = getNumUppercaseChars(tweet)
+	numMentions = len(tweet['entities'].get('user_mentions', []))
+	numHashtags = len(tweet['entities'].get('user_hashtags', []))
+	numUrls = len(tweet['entities'].get('urls', [])) + len(tweet['entities'].get('media', []))
+	rtCount = tweet.get('retweet_count', 0)
+	colonSymbol = ':' in counts
+	externLinkPresent = len(tweet['entities'].get('urls', [])) > 0
+	externalLink = checkForExternalLinks(tweet)
+	expandedLink = expandedUrl(externalLink)
+	indegree = getIndegree(expandedLink)
+	harmonic = getHarmonic(indegree, expandedLink, F_HARMONIC)
+	alexa_metrics = get_alexa_metrics(expandedLink)
+	wotValue = getWotTrustValue(externalLink)
+	numberNouns = numNouns(ttext)
+	readabilityValue = textstat.flesch_reading_ease(str(' '.join(ttext).encode('utf-8').strip()))
+	please_exists, _ = pattern_count(ttext, PATTERN_PLEASE)
+	containsFirstPron, _ = pattern_count(ttext, PATTERN_FIRSTPRON)
 	containsSecPron, _ = pattern_count(ttext, PATTERN_SECPRON)
 	containsThirdPron, _ = pattern_count(ttext, PATTERN_THIRDPRON)
-    _, slangWords = pattern_count(ttext, PATTERN_SLANG)
+	containsHappyEmo, _ = pattern_count(ttext, PATTERN_HAPPYEMO)
+	containsSadEmo, _ = pattern_count(ttext, PATTERN_SADEMO)
+	_, slangWords = pattern_count(ttext, PATTERN_SLANG)
 	_, negWords = pattern_count(ttext, PATTERN_NEGATIVE)
 	_, posWords = pattern_count(ttext, PATTERN_POSITIVE)
-	
-    features = (tid,
-                ttext,
+	features = (tid,
                 tlength,
                 twords,
                 questionSymbol,
                 exclamSymbol,
+				externLinkPresent,
+				numberNouns,
+				containsHappyEmo,
+				containsSadEmo,
+				containsFirstPron,
+				containsSecPron,
+				containsThirdPron,
+				numUpperCase,
+				posWords,
+				negWords,
+				numMentions,
+                numHashtags,
+				numUrls,
+				rtCount,
+				slangWords,
+				colonSymbol,
+				please_exists,
+				wotValue,
                 numQuesSymbol,
                 numExclamSymbol,
-                numUpperCase,
-                numMentions,
-                numHashtags,
-                numUrls,
-                rtCount,
-                colonSymbol,
-                externLinkPresent,
+				readabilityValue,
                 indegree,
                 harmonic,
-                *alexa_metrics,
-                WotValue,
-                numberNouns,
-                readabilityValue)
-
-    return features
+                alexa_metrics)
+	return features
 
 
 
@@ -320,15 +317,15 @@ def read_args():
     if len(sys.argv) == 2:
         tweets_data_path = sys.argv[1]
     else:
-        tweets_data_path = '../dataset/fake_real_tweets_training.json'
-
+        tweets_data_path = 'C:/Users/imaad/twitteradvancedsearch/real_tweets.json'
+	return tweets_data_path
 def main():
-    fin = read_args()
-    with open(fin) as f:
-        for line in f:
-            tweet = json.loads(line)
-            tweet_features = gen_features(tweet)
-            print(tweet_features)
+	fin = read_args()
+	with open(fin) as f:
+		for line in f:
+			tweet = json.loads(line)
+			tweet_features = gen_features(tweet)
+			print tweet_features
 
-if __name__ == '__main_':
+if __name__ == '__main__':
     main()

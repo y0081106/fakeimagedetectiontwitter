@@ -1,27 +1,20 @@
-from collections import Counter
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier
-from sklearn.model_selection import cross_val_score
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import precision_score, accuracy_score, f1_score
-from sklearn.metrics import recall_score
-from sklearn.metrics import average_precision_score
-from sklearn.utils import shuffle
-from sklearn import preprocessing
-from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler, Normalizer
-#from sklearn import datasets, linear_model, cross_validation, grid_search
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import Imputer
-from sklearn.model_selection import StratifiedShuffleSplit
-from sklearn.metrics import confusion_matrix
 import numpy as np
 import pandas as pd
 import time
 import pprint
 
+from collections import Counter
+from sklearn.model_selection import cross_val_score
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import confusion_matrix, accuracy_score, f1_score, recall_score
+from sklearn.utils import shuffle
+from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler, Normalizer
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import Imputer
+from sklearn.ensemble import RandomForestClassifier
+
 np.random.seed(0)
 
-start_time = time.time()
 item_prediction_values = []
 Ms = []
 cv_scores = []
@@ -116,15 +109,8 @@ def normalize(item_df):
 											'containSecPron', 'containThirdPron','colonSymbol','pleasePresent' ]).fit_transform(item_df)
 	return item_df
 
-#function that reads the csv file with the features and fills missing values and normalizes the values
-def read_df(file_name):
-    merged_df = pd.read_csv(file_name)
-    item_new = merged_df.loc[merged_df['AlexaCountry'] != 0]
-    merged_df = LinearReg(merged_df, item_new)
-    merged_df = normalize(merged_df)
-    return merged_df
-
-#function that reads the csv file with the features and fills missing values and normalizes the values and places #the class column at the end. It groups the columns by their event name and prepares separate dataframe for each #event
+#function that reads the csv file with the features and fills missing values and normalizes the values and places
+#the class column at the end. It groups the columns by their event name and prepares separate dataframe for each event
 def read_merged_df(file_name):
     merged_df = pd.read_csv(file_name)
     item_new = merged_df.loc[merged_df['AlexaCountry'] != 0]
@@ -138,7 +124,8 @@ def read_merged_df(file_name):
     event_df = [event_data.get_group(x) for x in event_data.groups]
     return event_df
 
-#function to prepare training and testing data. Data belonging to one event is used as training and all others #for testing in each iteration and is stored in item_testing_data and item_training_data. This is split into 
+#function to prepare training and testing data. Data belonging to one event is used as training and all others
+#for testing in each iteration and is stored in item_testing_data and item_training_data. This is split into
 #equivalent number of fake and real sets for the bagging technique.
 def prepare_data(event_df):
     for i,val in enumerate(event_df):
@@ -147,11 +134,6 @@ def prepare_data(event_df):
         event_train = event_df[:i]+event_df[i+1:]
         event_train = pd.concat(event_train)
         item_training_data.append(event_train)
-    for i in range(0, len(item_training_data)):
-        #item_training_data[i]= item_training_data[i].drop('tweet_id',1)
-        item_training_data[i]= item_training_data[i].drop('event',1)
-        #item_testing_data[i]= item_testing_data[i].drop('tweet_id',1)
-        item_testing_data[i]= item_testing_data[i].drop('event',1)
 
 
     for i in range(0, len(item_training_data)):
@@ -231,12 +213,14 @@ def train_test_data(item_split):
                 column.append(res_key_value[i][j][0][0])
         fin_val.append(column)
     return fin_val
-        
+
+#Function that calculates the accuracy of both the true and fake values
 def calc_accuracy(fin_val):
     for i in range(0,len(fin_val)):
         acc_scores.append(accuracy_score(item_Y_test[i], fin_val[i]))
     return acc_scores
 
+#Function that calcuates the accuracy of only the fake values
 def calc_fake_accuracy(final_predictions):
     accuracy_val_fake = []
     cmat_total = []
@@ -253,19 +237,33 @@ def calc_fake_accuracy(final_predictions):
                 cmat_sum = cmat_sum + cmat[0][i]
             cmat_total.append(cmat_sum)
         else:
-            cmat_total.append(cmat[0])   
+            cmat_total.append(cmat[0])
     #print cmat_val
     #print cmat_total
     for i in range(len(cmat_val)):
         accr = float(cmat_val[i])/cmat_total[i]
         accuracy_val_fake.append(float(accr))
     return accuracy_val_fake
-    #avg = sum(accuracy_val_fake)/len(accuracy_val_fake)
-    #print avg
-event_df = read_merged_df("item_merged_with_ids_2.csv")
-item_split = prepare_data(event_df)
-final_predictions = train_test_data(item_split) 
-return final_predictions
-#acc_score = calc_accuracy(final_predictions)
-#acc_fake_score = calc_fake_accuracy(final_predictions)
-#print acc_fake_score
+
+
+
+def read_args():
+    if len(sys.argv) == 2:
+        tweets_features = sys.argv[1]
+    else:
+        tweets_features = '../dataset/tweet_features_with_events.csv'
+    return tweets_features
+
+def main():
+    #getting the file with the extracted tweet features
+    fin = read_args()
+    #divide into dataframes based on their events. Also, fill missing values and normalize.
+    event_df = read_merged_df(fin)
+    #prepare the data into training and testing data
+    item_split = prepare_data(event_df)
+    #take the training and testing data and run classification by calling pipeline. We also perform the majority vote
+    #classification here
+    final_predictions = train_test_data(item_split)
+    print final_predictions
+if __name__ == '__main_':
+    main()
