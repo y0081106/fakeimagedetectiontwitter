@@ -1,0 +1,14 @@
+download
+http://webdatacommons.org/hyperlinkgraph/2012-08/download.html
+
+
+centrality
+http://data.dws.informatik.uni-mannheim.de/hyperlinkgraph/2012-08/ranking/hostgraph-h.tsv.gz
+
+indegree
+http://data.dws.informatik.uni-mannheim.de/hyperlinkgraph/2012-08/ranking/hostgraph-indegree.tsv.gz
+
+
+readability
+textstat python
+

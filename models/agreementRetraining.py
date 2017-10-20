@@ -37,7 +37,7 @@ for i in range(len(finVal)):
 
 for j in range(len(item_testing_data)):
     item_testing_data[j] = item_testing_data[j].set_index(np.array([i for i in agreedVal[j]]))
-	
+
 from collections import Counter
 disagreed_dfs = []
 for i in range(len(item_testing_data)):
@@ -53,16 +53,15 @@ for i in range(0, len(item_testing_data)):
         agreed_dfs.append(pd.concat([fake_df, real_df]))
     else:
         agreed_dfs.append(item_testing_data[i].loc[['fake']])
-    
+
 
 for i in range(0,len(item_testing_data)):
     print len(agreed_dfs[i])
     print len(disagreed_dfs[i])
     count_index = Counter(item_testing_data[i].index)
     print count_index
-	
 
-	
+
 repredict = []
 retest_df = []
 retest_X = []
@@ -75,14 +74,14 @@ for i in range(0, len(disagreed_dfs)):
 for i in range(len(disagreed_dfs)):
     repredict.append(retrain_model.predict(retest_X[i]))
 
-	
+
 for i in range(len(agreedVal)):
     k = 0
     for j in range(len(agreedVal[i])):
         if agreedVal[i][j] == 'disagreed':
             agreedVal[i][j] = repredict[i][k]
             k = k + 1
-			
+
 acc_scores=[]
 
 def calc_accuracy(fin_val):
