@@ -266,6 +266,15 @@ def read_args():
     else:
         tweets_features = '../dataset/tweet_features_with_events.csv'
     return tweets_features
+	
+def final_pred():
+	file_name = read_args()
+	df = pd.read_csv(file_name)
+	df = pre_processing(df)
+	df = prepare_data(df)
+	models = train_data(df)
+	final_predictions = test_data(models)
+	return final_predictions
 
 def main():
 	#getting the file with the extracted tweet features
