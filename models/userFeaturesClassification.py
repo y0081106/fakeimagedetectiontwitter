@@ -1,26 +1,22 @@
-from collections import Counter
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier
-from sklearn.model_selection import cross_val_score
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import precision_score, accuracy_score, f1_score
-from sklearn.metrics import recall_score
-from sklearn.metrics import average_precision_score
-from sklearn.utils import shuffle
-from sklearn import preprocessing
-from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler, Normalizer
-#from sklearn import datasets, linear_model, cross_validation, grid_search
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import Imputer
-from sklearn.model_selection import StratifiedShuffleSplit
 import numpy as np
 import pandas as pd
 import time
 import pprint
+import sys
+from collections import Counter
+from sklearn.model_selection import cross_val_score
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import confusion_matrix, accuracy_score, f1_score, recall_score
+from sklearn.utils import shuffle
+from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler, Normalizer
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import Imputer
+from sklearn.ensemble import RandomForestClassifier
 
 np.random.seed(0)
 
-start_time = time.time()
+NUM_MODELS = 9
+
 user_prediction_values = []
 user_Ms = []
 user_cv_scores = []
@@ -42,6 +38,7 @@ user_prediction_values = []
 user_testing_val = []
 user_acc_scores = []
 
+#Function that splits a DataFrame to a list of DataFrames of size n
 def split_dataframe(df, n):
     """
     Helper function that splits a DataFrame to a list of DataFrames of size n
@@ -55,8 +52,9 @@ def split_dataframe(df, n):
     batches = range(0, (df_size/n + 1) * n, n)
     return [df.iloc[i:i+n] for i in batches if i!=df_size] 
 
+#Function that returns the model fitted on the training data
 def pipelineUserFeatures(user_df):
-    userModelScores = []
+	#select only the first 23 values for X and the last one for Y
     user_X_train = user_df.values[:,0:22]
     user_Y_train = user_df.values[:,22]
     num_trees = 100
@@ -65,7 +63,8 @@ def pipelineUserFeatures(user_df):
     return user_model
 
 
-def UserLinearReg(user_df, user_new):
+def UserLinearReg(user_df):
+	user_new = user_df.loc[user_df['Indegree'] != 0]
     user_new_1 = user_new[['numFriends','numFollowers','followerFriendRatio','timesListed','numTweets','wotTrustValue','mediaContent',
                            'accountAge','tweetRatio']]
         
@@ -120,26 +119,34 @@ def normalizeUserFeatures(user_df):
 	user_df = MultiColumnLabelEncoder(columns = ['hasUrlCheck','verifiedUser','bioCheck','locationCheck','existingLocationCheck',
 												   'profileImgCheck','headerImgCheck']).fit_transform(user_df)
 	return user_df
-
-def read_merged_df(file_name):
-    merged_df = pd.read_csv(file_name)
-    user_new = merged_df.loc[merged_df['Indegree'] != 0]
-    merged_df = UserLinearReg(merged_df, user_new)
-    merged_df = normalizeUserFeatures(merged_df)
-    #merged_df = merged_df.drop('id',1)
-    cols = list(merged_df)
+	
+#function that fills missing values and normalizes the values and places
+#the class column at the end. It groups the columns by their event name and prepares separate dataframe for each event	
+def pre_processing(user_df):
+	user_df = UserLinearReg(user_df)
+    user_df = normalizeUserFeatures(user_df)
+	cols = list(user_df)
+	#inserting class at the end of the dataframe
     cols.insert(23, cols.pop(cols.index('class')))
-    merged_df = merged_df.ix[:, cols]
-    event_data = merged_df.groupby('event')
+    user_df = user_df.ix[:, cols]
+    event_data = user_df.groupby('event')
     event_df = [event_data.get_group(x) for x in event_data.groups]
+	event_df = event_df.drop('event',1)
     return event_df
-
+	
+#function to prepare training and testing data. Data belonging to one event is used as training and all others
+#for testing in each iteration and is stored in user_testing_data and user_training_data. This is split into
+#equivalent number of fake and real sets for the bagging technique.
 def prepare_data(event_df):
     for i,val in enumerate(event_df):
         test_data = pd.DataFrame(event_df[i])
+		#user_testing_data is a list with data from each event. To be used for testing
         user_testing_data.append(test_data)
+		#selecting training data for all events except for the one being tested
         event_train = event_df[:i]+event_df[i+1:]
+		#concatenating all event dataframes into one
         event_train = pd.concat(event_train)
+		#user_training_data is a list with data from all events except the one being tested
         user_training_data.append(event_train)
     for i in range(0, len(user_training_data)):
         #user_training_data[i]= user_training_data[i].drop('tweet_id',1)
@@ -259,10 +266,36 @@ def calc_fake_accuracy(final_predictions):
     #avg = sum(accuracy_val_fake)/len(accuracy_val_fake)
     #print avg
 
-event_df = read_merged_df("user_merged_with_ids_1.csv")
+event_df = read_user_df("user_merged_with_ids_1.csv")
 user_split = prepare_data(event_df)
 final_predictions = train_test_data(user_split) 
 return final_predictions
 #acc_score = calc_accuracy(final_predictions)
 #acc_fake_score = calc_fake_accuracy(final_predictions)
 #print acc_fake_score
+def read_args():
+    if len(sys.argv) == 2:
+        tweets_features = sys.argv[1]
+    else:
+        tweets_features ='C:\Users\imaad\twitteradvancedsearch\fakeimagedetectiontwitter\dataset\tweet_features_with_events.csv'
+    return tweets_features
+
+def main():
+    #getting the file with the extracted tweet features
+    file_name = read_args()
+    #read in csv with tweet features
+	df = pd.read_csv(file_name)
+	#preprocess it (Linear regression for missing values and normalizing the numeric values)
+    df = pre_processing(df)
+	#prepare data for training and testing
+	df = prepare_data(df)
+	#train 
+	models = train_data(df)
+	#predict
+	final_predictions = test_data(models)
+	#calculate accuracy
+	acc = calc_accuracy(final_predictions)
+    return final_predictions
+	
+if __name__ == '__main_':
+    main()

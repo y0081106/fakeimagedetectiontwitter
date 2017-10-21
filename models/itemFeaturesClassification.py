@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import time
 import pprint
-
+import sys
 from collections import Counter
 from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import LinearRegression
@@ -47,8 +47,7 @@ def split_dataframe(df, n):
 
 #Function that returns the model fitted on the training data
 def pipeline(item_df):
-    modelScores = []
-	#select only the first 31 values for X and the last one for Y
+	#select only the first 32 values for X and the last one for Y
     item_X_train = item_df.values[:,0:31]
     item_Y_train = item_df.values[:,31]
     num_trees = 100
@@ -116,15 +115,17 @@ def normalize(item_df):
 #function that fills missing values and normalizes the values and places
 #the class column at the end. It groups the columns by their event name and prepares separate dataframe for each event	
 def pre_processing(item_df):
-	item_df = LinearReg(item_df)
-	item_df = normalize(item_df)
-	cols = list(merged_df)
-	#inserting class at the end of the dataframe
+    item_df = LinearReg(item_df)
+    item_df = normalize(item_df)
+    cols = list(item_df)
+    #inserting class at the end of the dataframe
     cols.insert(len(cols), cols.pop(cols.index('class')))
     item_df = item_df.ix[:, cols]
-	event_data = item_df.groupby('event')
+    event_data = item_df.groupby('event')
     event_df = [event_data.get_group(x) for x in event_data.groups]
-	return event_df
+    for i in range(len(event_df)):
+        event_df[i] = event_df[i].drop('event',1)
+    return event_df
 
 #function to prepare training and testing data. Data belonging to one event is used as training and all others
 #for testing in each iteration and is stored in item_testing_data and item_training_data. This is split into
@@ -171,11 +172,12 @@ def prepare_data(event_df):
 def train_data(item_split):
     for i in range(0,len(item_split)):
         model_column = []
-        for j in range(NUM_MODELS):
+        for j in range(0,NUM_MODELS):
             model = pipeline(item_split[i][j])
             model_column.append(model)
         Ms.append(model_column)
-	return Ms
+    models = Ms 
+    return models
 	
 def test_data(Ms):
     for i in range(0, len(item_testing_data)):
@@ -187,7 +189,7 @@ def test_data(Ms):
     testing_val = []
     for i in range(0,len(Ms)):
         pred_column = []
-        for j in range(NUM_MODELS):
+        for j in range(0,NUM_MODELS):
             pred_column.append(Ms[i][j].predict(item_X_test[i]))
 		#item_prediction_values contains the predictions. i loop contains the classifier number, j loop the predictions
         item_prediction_values.append(pred_column)
@@ -199,7 +201,7 @@ def test_data(Ms):
         column1 = []
         for j in range(len(item_prediction_values[i][0])):
             column2 = []
-            for k in range(NUM_MODELS):
+            for k in range(0,NUM_MODELS):
                 column2.append(item_prediction_values[i][k][j])
             column1.append(column2)
         pred_vals.append(column1)
@@ -261,25 +263,33 @@ def read_args():
     if len(sys.argv) == 2:
         tweets_features = sys.argv[1]
     else:
-        tweets_features = '../dataset/tweet_features_with_events.csv'
+        tweets_features = 'C:/Users/imaad/twitteradvancedsearch/fakeimagedetectiontwitter/dataset/tweet_features_with_events.csv'
     return tweets_features
 
 def main():
-    #getting the file with the extracted tweet features
-    file_name = read_args()
-    #read in csv with tweet features
+	#getting the file with the extracted tweet features
+	print "get file name"
+	file_name = read_args()
+	#read in csv with tweet features
+	print "read the file"
 	df = pd.read_csv(file_name)
 	#preprocess it (Linear regression for missing values and normalizing the numeric values)
-    df = pre_processing(df)
+	print "pre processing"
+	df = pre_processing(df)
 	#prepare data for training and testing
+	print "preparing data"
 	df = prepare_data(df)
 	#train 
+	print "training"
 	models = train_data(df)
 	#predict
+	print "prediction"
 	final_predictions = test_data(models)
 	#calculate accuracy
+	print "calc_accuracy"
 	acc = calc_accuracy(final_predictions)
-    return final_predictions
-if __name__ == '__main_':
-    main()
+	#return final_predictions
+	print acc
 	
+if __name__ == '__main__':
+    main()
