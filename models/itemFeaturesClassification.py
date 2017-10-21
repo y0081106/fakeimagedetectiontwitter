@@ -15,6 +15,8 @@ from sklearn.ensemble import RandomForestClassifier
 
 np.random.seed(0)
 
+NUM_MODELS = 9
+
 item_prediction_values = []
 Ms = []
 cv_scores = []
@@ -46,6 +48,7 @@ def split_dataframe(df, n):
 #Function that returns the model fitted on the training data
 def pipeline(item_df):
     modelScores = []
+	#select only the first 31 values for X and the last one for Y
     item_X_train = item_df.values[:,0:31]
     item_Y_train = item_df.values[:,31]
     num_trees = 100
@@ -54,8 +57,8 @@ def pipeline(item_df):
     return item_model
 
 #Function that calculates linear regression
-def LinearReg(item, item_new):
-    
+def LinearReg(item):
+    item_new = item.loc[item['AlexaCountry'] != 0]
     item_new_1 = item_new[['tweetTextLen', 'numItemWords', 'numQuesSymbol', 'numExclamSymbol','numUpperCase',
                        'numMentions', 'numHashtags' , 'numUrls' , 'positiveWords' , 'negativeWords',
                        'slangWords', 'rtCount', 'WotValue','numberNouns',  'readabilityValue']]
@@ -71,6 +74,7 @@ def LinearReg(item, item_new):
         linearmodel = lr.fit(X_train, Y_train[i]) 
         item[column_names[i]] = lr.predict(X_new_vals)
     return item
+	
 #class that encodes columns with string values to numeric values
 class MultiColumnLabelEncoder:
 	def __init__(self,columns = None):
@@ -109,20 +113,18 @@ def normalize(item_df):
 											'containSecPron', 'containThirdPron','colonSymbol','pleasePresent' ]).fit_transform(item_df)
 	return item_df
 
-#function that reads the csv file with the features and fills missing values and normalizes the values and places
-#the class column at the end. It groups the columns by their event name and prepares separate dataframe for each event
-def read_merged_df(file_name):
-    merged_df = pd.read_csv(file_name)
-    item_new = merged_df.loc[merged_df['AlexaCountry'] != 0]
-    merged_df = LinearReg(merged_df, item_new)
-    merged_df = normalize(merged_df)
-    #merged_df = merged_df.drop('id',1)
-    cols = list(merged_df)
-    cols.insert(33, cols.pop(cols.index('class')))
-    merged_df = merged_df.ix[:, cols]
-    event_data = merged_df.groupby('event')
+#function that fills missing values and normalizes the values and places
+#the class column at the end. It groups the columns by their event name and prepares separate dataframe for each event	
+def pre_processing(item_df):
+	item_df = LinearReg(item_df)
+	item_df = normalize(item_df)
+	cols = list(merged_df)
+	#inserting class at the end of the dataframe
+    cols.insert(len(cols), cols.pop(cols.index('class')))
+    item_df = item_df.ix[:, cols]
+	event_data = item_df.groupby('event')
     event_df = [event_data.get_group(x) for x in event_data.groups]
-    return event_df
+	return event_df
 
 #function to prepare training and testing data. Data belonging to one event is used as training and all others
 #for testing in each iteration and is stored in item_testing_data and item_training_data. This is split into
@@ -130,26 +132,34 @@ def read_merged_df(file_name):
 def prepare_data(event_df):
     for i,val in enumerate(event_df):
         test_data = pd.DataFrame(event_df[i])
+		#item_testing_data is a list with data from each event. To be used for testing
         item_testing_data.append(test_data)
+		#selecting training data for all events except for the one being tested
         event_train = event_df[:i]+event_df[i+1:]
+		#concatenating all event dataframes into one
         event_train = pd.concat(event_train)
+		#item_training_data is a list with data from all events except the one being tested
         item_training_data.append(event_train)
 
-
-    for i in range(0, len(item_training_data)):
-        #print len(item_training_data[i])
+	#iterate over item_training_data. item_training_data (in our case) has a len of 17 as it has all training samples in each 
+	#iteration except the one being tested
+    for i in range(len(item_training_data)):
+		#Count the number of classes in each iteration
         a = Counter(item_training_data[i]['class'])
-        fake_count.append(a['fake']/9)
-        real_count.append(a['real']/9)
-        item_df = item_training_data[i]
-        item_fake.append(item_df.ix[item_df['class']=='fake'])
-        item_real.append(item_df.ix[item_df['class']=='real'])
+		#fake_count and real_count has the number of fake and real classes in each iteration for each model
+        fake_count.append(a['fake']/NUM_MODELS)
+        real_count.append(a['real']/NUM_MODELS)
+		#item_fake and item_real has the fake and real classes in each iteration
+        item_fake.append(item_training_data[i].ix[item_training_data[i]['class']=='fake'])
+        item_real.append(item_training_data[i].ix[item_training_data[i]['class']=='real'])
 
-    for i in range(0, len(item_fake)):
+    for i in range(len(item_fake)):
+		#item_fake_split and item_real_split has the split dataframe for each iteration and for each model
         item_fake_split.append(split_dataframe(item_fake[i], (fake_count[i])+1))
         item_real_split.append(split_dataframe(item_real[i],(real_count[i])+1))
     
-    for i in range(0, len(item_fake_split)):
+	#2D List containing 9 instances of concatenated fake and real tweets for each event (17 in total)
+    for i in range(len(item_fake_split)):
         column = []
         for j in range(0, len(item_fake_split[i])):
             column.append(pd.concat([item_fake_split[i][j],item_real_split[i][j]]))
@@ -157,16 +167,18 @@ def prepare_data(event_df):
     return(item_split)
 
 #function to train and test the split data. Calls the pipeline function to perform the supervised learning task. #Each learned model is stored in Ms and is used for prediction and majority voting takes place to determine the #final prediction.
-def train_test_data(item_split):
+
+def train_data(item_split):
     for i in range(0,len(item_split)):
         model_column = []
-        for j in range(0,9):
+        for j in range(NUM_MODELS):
             model = pipeline(item_split[i][j])
             model_column.append(model)
         Ms.append(model_column)
-
+	return Ms
+	
+def test_data(Ms):
     for i in range(0, len(item_testing_data)):
-        #item_testing_data[i] = item_testing_data[i].drop('event',1)
         item_df = item_testing_data[i]
         item_X_test.append(item_df.values[:,0:31])
         item_Y_test.append(item_df.values[:,31])
@@ -175,9 +187,11 @@ def train_test_data(item_split):
     testing_val = []
     for i in range(0,len(Ms)):
         pred_column = []
-        for j in range(0,9):
+        for j in range(NUM_MODELS):
             pred_column.append(Ms[i][j].predict(item_X_test[i]))
+		#item_prediction_values contains the predictions. i loop contains the classifier number, j loop the predictions
         item_prediction_values.append(pred_column)
+		#adding the true values to testing_val
         testing_val.append(item_Y_test[i])
 
     pred_vals = []
@@ -185,13 +199,14 @@ def train_test_data(item_split):
         column1 = []
         for j in range(len(item_prediction_values[i][0])):
             column2 = []
-            for k in range(0,9):
+            for k in range(NUM_MODELS):
                 column2.append(item_prediction_values[i][k][j])
             column1.append(column2)
         pred_vals.append(column1)
 
     fin_val = []
     res_key_value = []
+	#2D list with predictions from each of the classifier, i loop contains the classifiers, j loops the samples that were #predicted in each case
     for i in range(0, len(pred_vals)):
         col = []
         for j in range(0,len(pred_vals[i])):
@@ -199,29 +214,26 @@ def train_test_data(item_split):
             res_key_val = result.keys(), result.values()
             col.append(res_key_val)
         res_key_value.append(col)
-
+		
+	#majority vote prediction
     for i in range(0,len(pred_vals)):
         column = []
         for j in range(0, len(pred_vals[i])):
-        #print len(res_key_value[i])
+		# if both fake and real have been predicted then len is >= 2 
             if len(res_key_value[i][j][0]) >= 2:
+			#If count for real is greater than count for fake
                 if res_key_value[i][j][1][0] > res_key_value[i][j][1][1]:
                     column.append("real")
                 else:
                     column.append("fake")
             else:
+			#else append the first value in res_key_value since there was only one prediction by all the 9 instances
                 column.append(res_key_value[i][j][0][0])
         fin_val.append(column)
     return fin_val
-
-#Function that calculates the accuracy of both the true and fake values
-def calc_accuracy(fin_val):
-    for i in range(0,len(fin_val)):
-        acc_scores.append(accuracy_score(item_Y_test[i], fin_val[i]))
-    return acc_scores
-
+	
 #Function that calcuates the accuracy of only the fake values
-def calc_fake_accuracy(final_predictions):
+def calc_accuracy(final_predictions):
     accuracy_val_fake = []
     cmat_total = []
     cmat_val = []
@@ -245,8 +257,6 @@ def calc_fake_accuracy(final_predictions):
         accuracy_val_fake.append(float(accr))
     return accuracy_val_fake
 
-
-
 def read_args():
     if len(sys.argv) == 2:
         tweets_features = sys.argv[1]
@@ -256,14 +266,20 @@ def read_args():
 
 def main():
     #getting the file with the extracted tweet features
-    fin = read_args()
-    #divide into dataframes based on their events. Also, fill missing values and normalize.
-    event_df = read_merged_df(fin)
-    #prepare the data into training and testing data
-    item_split = prepare_data(event_df)
-    #take the training and testing data and run classification by calling pipeline. We also perform the majority vote
-    #classification here
-    final_predictions = train_test_data(item_split)
-    print final_predictions
+    file_name = read_args()
+    #read in csv with tweet features
+	df = pd.read_csv(file_name)
+	#preprocess it (Linear regression for missing values and normalizing the numeric values)
+    df = pre_processing(df)
+	#prepare data for training and testing
+	df = prepare_data(df)
+	#train 
+	models = train_data(df)
+	#predict
+	final_predictions = test_data(models)
+	#calculate accuracy
+	acc = calc_accuracy(final_predictions)
+    return final_predictions
 if __name__ == '__main_':
     main()
+	
