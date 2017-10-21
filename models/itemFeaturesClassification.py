@@ -3,6 +3,7 @@ import pandas as pd
 import time
 import pprint
 import sys
+
 from collections import Counter
 from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import LinearRegression
@@ -167,7 +168,7 @@ def prepare_data(event_df):
         item_split.append(column)
     return(item_split)
 
-#function to train and test the split data. Calls the pipeline function to perform the supervised learning task. #Each learned model is stored in Ms and is used for prediction and majority voting takes place to determine the #final prediction.
+#functions to train and test the split data. Calls the pipeline function to perform the supervised learning task. #Each learned model is stored in Ms and is used for prediction and majority voting takes place to determine the #final prediction.
 
 def train_data(item_split):
     for i in range(0,len(item_split)):
@@ -263,7 +264,7 @@ def read_args():
     if len(sys.argv) == 2:
         tweets_features = sys.argv[1]
     else:
-        tweets_features = 'C:/Users/imaad/twitteradvancedsearch/fakeimagedetectiontwitter/dataset/tweet_features_with_events.csv'
+        tweets_features = '../dataset/tweet_features_with_events.csv'
     return tweets_features
 
 def main():

@@ -3,6 +3,7 @@ import pandas as pd
 import time
 import pprint
 import sys
+
 from collections import Counter
 from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import LinearRegression
@@ -62,15 +63,15 @@ def pipelineUserFeatures(user_df):
     user_model = rfc.fit(user_X_train, user_Y_train)
     return user_model
 
-
+#Function that calculates linear regression
 def UserLinearReg(user_df):
-	user_new = user_df.loc[user_df['Indegree'] != 0]
+    user_new = user_df.loc[user_df['Indegree'] != 0]
     user_new_1 = user_new[['numFriends','numFollowers','followerFriendRatio','timesListed','numTweets','wotTrustValue','mediaContent',
                            'accountAge','tweetRatio']]
-        
+
     user_df_1 = user_df[['numFriends','numFollowers','followerFriendRatio','timesListed','numTweets','wotTrustValue','mediaContent',
                            'accountAge','tweetRatio']]
-    
+
     user_lr = LinearRegression()
     user_X_train = user_new_1
     user_new_vals = user_df_1
@@ -82,7 +83,7 @@ def UserLinearReg(user_df):
         user_df[user_column_names[i]] = user_lr.predict(user_new_vals)
     return user_df
 
-
+#class that encodes columns with string values to numeric values
 class MultiColumnLabelEncoder:
 	def __init__(self,columns = None):
 		self.columns = columns # array of column names to encode
@@ -123,17 +124,18 @@ def normalizeUserFeatures(user_df):
 #function that fills missing values and normalizes the values and places
 #the class column at the end. It groups the columns by their event name and prepares separate dataframe for each event	
 def pre_processing(user_df):
-	user_df = UserLinearReg(user_df)
+    user_df = UserLinearReg(user_df)
     user_df = normalizeUserFeatures(user_df)
-	cols = list(user_df)
-	#inserting class at the end of the dataframe
-    cols.insert(23, cols.pop(cols.index('class')))
+    cols = list(user_df)
+    #inserting class at the end of the dataframe
+    cols.insert(len(cols), cols.pop(cols.index('class')))
     user_df = user_df.ix[:, cols]
     event_data = user_df.groupby('event')
     event_df = [event_data.get_group(x) for x in event_data.groups]
-	event_df = event_df.drop('event',1)
+    for i in range(len(event_df)):
+        event_df[i] = event_df[i].drop('event',1)
     return event_df
-	
+
 #function to prepare training and testing data. Data belonging to one event is used as training and all others
 #for testing in each iteration and is stored in user_testing_data and user_training_data. This is split into
 #equivalent number of fake and real sets for the bagging technique.
@@ -148,18 +150,13 @@ def prepare_data(event_df):
         event_train = pd.concat(event_train)
 		#user_training_data is a list with data from all events except the one being tested
         user_training_data.append(event_train)
-    for i in range(0, len(user_training_data)):
-        #user_training_data[i]= user_training_data[i].drop('tweet_id',1)
-        user_training_data[i]= user_training_data[i].drop('event',1)
-        #user_testing_data[i]= user_testing_data[i].drop('tweet_id',1)
-        user_testing_data[i]= user_testing_data[i].drop('event',1)
 
-
+	#iterate over item_training_data. user_training_data (in our case) has a len of 17 as it has all training samples in each 
+	#iteration except the one being tested	
     for i in range(0, len(user_training_data)):
-        #print len(item_training_data[i])
         a = Counter(user_training_data[i]['class'])
-        user_fake_count.append(a['fake']/9)
-        user_real_count.append(a['real']/9)
+        user_fake_count.append(a['fake']/NUM_MODELS)
+        user_real_count.append(a['real']/NUM_MODELS)
         user_df = user_training_data[i]
         user_fake.append(user_df.ix[user_df['class']=='fake'])
         user_real.append(user_df.ix[user_df['class']=='real'])
@@ -175,14 +172,17 @@ def prepare_data(event_df):
         user_split.append(column)
     return(user_split)
 
-def train_test_data(user_split):
+def train_data(user_split):
     for i in range(0,len(user_split)):
         model_column = []
-        for j in range(0,9):
+        for j in range(0,NUM_MODELS):
             model = pipelineUserFeatures(user_split[i][j])
             model_column.append(model)
         user_Ms.append(model_column)
+	models = user_Ms 
+    return models
 
+def test_data(user_Ms):
     for i in range(0, len(user_testing_data)):
         #item_testing_data[i] = item_testing_data[i].drop('event',1)
         user_df = user_testing_data[i]
@@ -234,12 +234,7 @@ def train_test_data(user_split):
         user_fin_val.append(column)
     return user_fin_val
         
-def calc_accuracy(user_fin_val):
-    for i in range(0,len(user_fin_val)):
-        user_acc_scores.append(accuracy_score(user_Y_test[i], user_fin_val[i]))
-    return user_acc_scores
-    
-def calc_fake_accuracy(final_predictions):
+def calc_accuracy(final_predictions):
     accuracy_val_fake = []
     cmat_total = []
     cmat_val = []
@@ -248,7 +243,6 @@ def calc_fake_accuracy(final_predictions):
         y_true = user_testing_data[i]['class']
         y_pred = final_predictions[i]
         cmat = confusion_matrix(y_true,y_pred)
-        print cmat
         cmat_val.append(cmat[0][0])
         if len(cmat[0]>1):
             cmat_sum = 0
@@ -257,45 +251,42 @@ def calc_fake_accuracy(final_predictions):
             cmat_total.append(cmat_sum)
         else:
             cmat_total.append(cmat[0])   
-    #print cmat_val
-    #print cmat_total
     for i in range(len(cmat_val)):
         accr = float(cmat_val[i])/cmat_total[i]
         accuracy_val_fake.append(float(accr))
     return accuracy_val_fake
-    #avg = sum(accuracy_val_fake)/len(accuracy_val_fake)
-    #print avg
 
-event_df = read_user_df("user_merged_with_ids_1.csv")
-user_split = prepare_data(event_df)
-final_predictions = train_test_data(user_split) 
-return final_predictions
-#acc_score = calc_accuracy(final_predictions)
-#acc_fake_score = calc_fake_accuracy(final_predictions)
-#print acc_fake_score
 def read_args():
     if len(sys.argv) == 2:
-        tweets_features = sys.argv[1]
+        user_features = sys.argv[1]
     else:
-        tweets_features ='C:\Users\imaad\twitteradvancedsearch\fakeimagedetectiontwitter\dataset\tweet_features_with_events.csv'
-    return tweets_features
+        user_features ='C:/Users/imaad/twitteradvancedsearch/fakeimagedetectiontwitter/dataset/user_features_with_events.csv'
+    return user_features
 
 def main():
-    #getting the file with the extracted tweet features
-    file_name = read_args()
-    #read in csv with tweet features
+	#getting the file with the extracted tweet features
+	print "get file name"
+	file_name = read_args()
+	#read in csv with tweet features
+	print "read the file"
 	df = pd.read_csv(file_name)
 	#preprocess it (Linear regression for missing values and normalizing the numeric values)
-    df = pre_processing(df)
+	print "pre processing"
+	df = pre_processing(df)
 	#prepare data for training and testing
+	print "preparing data"
 	df = prepare_data(df)
 	#train 
+	print "training"
 	models = train_data(df)
 	#predict
+	print "prediction"
 	final_predictions = test_data(models)
 	#calculate accuracy
+	print "calc_accuracy"
 	acc = calc_accuracy(final_predictions)
-    return final_predictions
+	#return final_predictions
+	print acc
 	
-if __name__ == '__main_':
+if __name__ == '__main__':
     main()
