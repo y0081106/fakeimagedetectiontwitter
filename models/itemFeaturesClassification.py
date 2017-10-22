@@ -1,17 +1,12 @@
 import numpy as np
 import pandas as pd
-import time
-import pprint
 import sys
 
 from collections import Counter
-from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import confusion_matrix, accuracy_score, f1_score, recall_score
-from sklearn.utils import shuffle
-from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler, Normalizer
+from sklearn.metrics import confusion_matrix
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import Imputer
 from sklearn.ensemble import RandomForestClassifier
 
 np.random.seed(0)
@@ -115,7 +110,7 @@ def normalize(item_df):
 
 #function that fills missing values and normalizes the values and places
 #the class column at the end. It groups the columns by their event name and prepares separate dataframe for each event	
-def pre_processing(item_df):
+def preprocess(item_df):
     item_df = LinearReg(item_df)
     item_df = normalize(item_df)
     cols = list(item_df)
@@ -131,7 +126,7 @@ def pre_processing(item_df):
 #function to prepare training and testing data. Data belonging to one event is used as training and all others
 #for testing in each iteration and is stored in item_testing_data and item_training_data. This is split into
 #equivalent number of fake and real sets for the bagging technique.
-def prepare_data(event_df):
+def prepare(event_df):
     for i,val in enumerate(event_df):
         test_data = pd.DataFrame(event_df[i])
 		#item_testing_data is a list with data from each event. To be used for testing
@@ -170,7 +165,7 @@ def prepare_data(event_df):
 
 #functions to train and test the split data. Calls the pipeline function to perform the supervised learning task. #Each learned model is stored in Ms and is used for prediction and majority voting takes place to determine the #final prediction.
 
-def train_data(item_split):
+def fit(item_split):
     for i in range(0,len(item_split)):
         model_column = []
         for j in range(0,NUM_MODELS):
@@ -180,7 +175,7 @@ def train_data(item_split):
     models = Ms 
     return models
 	
-def test_data(Ms):
+def predict(Ms):
     for i in range(0, len(item_testing_data)):
         item_df = item_testing_data[i]
         item_X_test.append(item_df.values[:,0:31])
@@ -236,7 +231,7 @@ def test_data(Ms):
     return fin_val
 	
 #Function that calcuates the accuracy of only the fake values
-def calc_accuracy(final_predictions):
+def accuracy(final_predictions):
     accuracy_val_fake = []
     cmat_total = []
     cmat_val = []
@@ -270,10 +265,10 @@ def read_args():
 def final_pred():
 	file_name = read_args()
 	df = pd.read_csv(file_name)
-	df = pre_processing(df)
-	df = prepare_data(df)
-	models = train_data(df)
-	final_predictions = test_data(models)
+	df = preprocess(df)
+	df = prepare(df)
+	models = fit(df)
+	final_predictions = predict(models)
 	return final_predictions
 
 def main():
@@ -285,21 +280,22 @@ def main():
 	df = pd.read_csv(file_name)
 	#preprocess it (Linear regression for missing values and normalizing the numeric values)
 	print "pre processing"
-	df = pre_processing(df)
-	#prepare data for training and testing
+	df = preprocess(df)
+	#prepare data for training and testing (split data samples based on class)
 	print "preparing data"
-	df = prepare_data(df)
+	df = prepare(df)
 	#train 
 	print "training"
-	models = train_data(df)
+	models = fit(df)
 	#predict
 	print "prediction"
-	final_predictions = test_data(models)
+	final_predictions = predict(models)
 	#calculate accuracy
 	print "calc_accuracy"
-	acc = calc_accuracy(final_predictions)
+	acc = accuracy(final_predictions)
 	#return final_predictions
-	print acc
+	avg = sum(acc)/len(acc)
+	print avg
 	
 if __name__ == '__main__':
     main()

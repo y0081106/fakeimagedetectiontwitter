@@ -123,7 +123,7 @@ def normalizeUserFeatures(user_df):
 	
 #function that fills missing values and normalizes the values and places
 #the class column at the end. It groups the columns by their event name and prepares separate dataframe for each event	
-def pre_processing(user_df):
+def preprocess(user_df):
     user_df = UserLinearReg(user_df)
     user_df = normalizeUserFeatures(user_df)
     cols = list(user_df)
@@ -139,7 +139,7 @@ def pre_processing(user_df):
 #function to prepare training and testing data. Data belonging to one event is used as training and all others
 #for testing in each iteration and is stored in user_testing_data and user_training_data. This is split into
 #equivalent number of fake and real sets for the bagging technique.
-def prepare_data(event_df):
+def prepare(event_df):
     for i,val in enumerate(event_df):
         test_data = pd.DataFrame(event_df[i])
 		#user_testing_data is a list with data from each event. To be used for testing
@@ -172,7 +172,7 @@ def prepare_data(event_df):
         user_split.append(column)
     return(user_split)
 
-def train_data(user_split):
+def fit(user_split):
     for i in range(0,len(user_split)):
         model_column = []
         for j in range(0,NUM_MODELS):
@@ -182,7 +182,7 @@ def train_data(user_split):
 	models = user_Ms 
     return models
 
-def test_data(user_Ms):
+def predict(user_Ms):
     for i in range(0, len(user_testing_data)):
         #item_testing_data[i] = item_testing_data[i].drop('event',1)
         user_df = user_testing_data[i]
@@ -234,7 +234,7 @@ def test_data(user_Ms):
         user_fin_val.append(column)
     return user_fin_val
         
-def calc_accuracy(final_predictions):
+def accuracy(final_predictions):
     accuracy_val_fake = []
     cmat_total = []
     cmat_val = []
@@ -260,16 +260,16 @@ def read_args():
     if len(sys.argv) == 2:
         user_features = sys.argv[1]
     else:
-        user_features ='C:/Users/imaad/twitteradvancedsearch/fakeimagedetectiontwitter/dataset/user_features_with_events.csv'
+        user_features ='../dataset/user_features_with_events.csv'
     return user_features
 
 def final_pred():
 	file_name = read_args()
 	df = pd.read_csv(file_name)
-	df = pre_processing(df)
-	df = prepare_data(df)
-	models = train_data(df)
-	final_predictions = test_data(models)
+	df = preprocess(df)
+	df = prepare(df)
+	models = fit(df)
+	final_predictions = predict(models)
 	return final_predictions
 	
 def main():
@@ -281,21 +281,22 @@ def main():
 	df = pd.read_csv(file_name)
 	#preprocess it (Linear regression for missing values and normalizing the numeric values)
 	print "pre processing"
-	df = pre_processing(df)
+	df = preprocess(df)
 	#prepare data for training and testing
 	print "preparing data"
-	df = prepare_data(df)
+	df = prepare(df)
 	#train 
 	print "training"
-	models = train_data(df)
+	models = fit(df)
 	#predict
 	print "prediction"
-	final_predictions = test_data(models)
+	final_predictions = predict(models)
 	#calculate accuracy
 	print "calc_accuracy"
-	acc = calc_accuracy(final_predictions)
+	acc = accuracy(final_predictions)
 	#return final_predictions
-	print acc
+	avg = sum(acc)/len(acc)
+	print avg
 	
 if __name__ == '__main__':
     main()

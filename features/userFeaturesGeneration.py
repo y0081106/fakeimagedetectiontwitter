@@ -12,8 +12,10 @@ import nltk
 import csv
 import pickle
 import emoji
+import sys
 
 from PIL import Image
+from urlparse import urlparse
 from datetime import datetime
 from nltk.tag import pos_tag
 from langdetect import detect
@@ -23,6 +25,7 @@ from dateutil.parser import parse
 from geopy.geocoders import Nominatim
 from textstat.textstat import textstat
 from nltk.tokenize import word_tokenize
+
 
 F_HARMONIC = "D:/Downloads/hostgraph-h.tsv/hostgraph-h.tsv"
 F_INDEGREE = "D:/Downloads/hostgraph-indegree.tsv/hostgraph-indegree.tsv"
@@ -68,18 +71,20 @@ def isAnImage(url):
 			return True
 		else:
 			return False
-	except IOError:
+	except Exception, e:
 		return False
 
-def checkForExternalLinks(tweets_data):
-	numurls1 = []
-	urlList = []
-	numUrls1 = map(lambda tweet: tweet['entities']['urls'] if tweet['entities'] != None else None, tweets_data)
-	if len(numUrls1) > 0:
-		numurls1.extend(tweet['entities']['urls'])
-		tweet['url1'] = [numurl['url'] for numurl in numurls1]
-		urlList.extend(tweet['url1'])
-	for ural in urlList:
+def checkForExternalLinks(tweet):
+    numurls1 = []
+    urlList = []
+    numUrls1 = tweet['entities']['urls'] 
+    if len(numUrls1) > 0:
+        numurls1.extend(tweet['entities']['urls'])
+        tweet['url1'] = [numurl['url'] for numurl in numurls1]
+        #print tweet['url1']
+        urlList.extend(tweet['url1'])
+    #print urlList
+    for ural in urlList:
 		checkForImage = isAnImage(ural)
 		if  not checkForImage:
 			return ural
@@ -109,16 +114,16 @@ def expandUrl(shortenedUrl):
 	expandedUrlNameStr = str(expandedUrlName[0])
 	return expandedUrlNameStr
 
-def getWotTrustValue(host):
-	if host == None:
+def getWotTrustValue(expandUrlName):
+	if expandUrlName == None:
 		return 0
-	expandUrlName = expandUrl(host)
-	if "/" in expandUrlName:
-		expandUrlName1 = expandUrlName.split("/")[2:3]
-	else:
-		expandUrlName1 = expandUrlName.split("/")[:]
-	expandUrlNameStr = str(expandUrlName1[0])
-	value = [None]
+	parse_obj = urlparse(expandUrlName)
+	expandUrlNameStr = str(parse_obj.netloc)
+	#if "/" in expandUrlName:
+		#expandUrlName1 = expandUrlName.split("/")[2:3]
+	#else:
+		#expandUrlName1 = expandUrlName.split("/")[:]
+	#expandUrlNameStr = str(expandUrlName1[0])
 	url = "http://api.mywot.com/0.4/public_link_json2?hosts="+ expandUrlNameStr +"/&key=108d4b2a42ea1afc370e668b39cabdceaa19fcf0"
 	#print url
 	response = urllib.urlopen(url)
@@ -185,8 +190,8 @@ def getAccountAge(tweet):
 	delta = my_time - epoch
 	return delta.total_seconds()
 
-def getTweetRatio(tweets_data, accountAge, numTweets):
-	timeCreated = map(lambda tweet: tweet['created_at'], tweets_data)
+def getTweetRatio(tweet, accountAge, numTweets):
+	timeCreated = tweet['created_at']
 	for i in timeCreated:
 		timeCreatedStr = i.encode('utf-8', 'ignore')
 	#timeCreatedStr = ''.join(str(i) for i in timeCreated)
@@ -215,48 +220,59 @@ def getTweetRatio(tweets_data, accountAge, numTweets):
 	else:
 		return 0
 	
-def getIndegree(tweetsara,externLink, file_name):
-	if externLink == None:
-		return 0
-	with open(file_name, 'rb') as tsvin:
-		tsvreader = csv.reader(tsvin,delimiter="\t")
-		for row in tsvreader:
-			if expandedLink == row[0]:
-				return row[1]
-				#break
+def getIndegree(expandedLink, fin=F_INDEGREE):
+    #print expandedLink
+    if expandedLink == "twitter.com":
+        expandedLink = None
+    indegreeval = None
+
+    if expandedLink == None:
+    	return 0
+    with open(fin, 'rb') as tsvin:
+    	tsvreader = csv.reader(tsvin,delimiter="\t")
+    	for row in tsvreader:
+    		if expandedLink == row[0]:
+    			return row[1]
+
+def getHarmonic(indegree, expandedLink, f_harmonic):
+    if indegree == None:
+        return None
+    return getIndegree(expandedLink, F_HARMONIC)
 
   
 def gen_features(tweet):
-    tid = tweet['id_str']
-    numFriends = tweet['user'].get('friends_count',0)
-    numFollowers = tweet['user'].get('followers_count',0)
+	tid = tweet['id_str']
+	numFriends = tweet['user'].get('friends_count',0)
+	numFollowers = tweet['user'].get('followers_count',0)
 	if numFollowers != 0:
 		folFriendRatio = float(numFriends)/(numFollowers)
 	else:
 		folFriendRatio = 0
 	timesListed = tweet['user']['listed_count']
 	hasUrl = len(tweet['user'].get('urls', [])) > 0
-	isVerified = len(tweet['user'].get('verified',[])) > 0
+	isVerified = tweet['user'].get('verified',[])
 	numTweets = tweet['user'].get('statuses_count',0)
 	hasBio = len(tweet['user'].get('description', [])) > 0
-	hasLocation = len(tweet['user'].get('location', []) > 0
+	hasLocation = len(tweet['user'].get('location', [])) > 0
 	hasExistingLoc = hasExistingLocation(tweet)
+	externalLink = checkForExternalLinks(tweet)
+	expandedLink = expandedUrl(externalLink)
 	wotValue = getWotTrustValue(externalLink)
 	numMedia = numMediaContent(tweet)
 	accountAge = getAccountAge(tweet)
 	hasProfileImg = tweet['user']['default_profile_image']
 	hasHeaderImg = tweet['user']['profile_use_background_image']
-	tweetRatio = getTweetRatio(tweet)
-    indegree = getIndegree(expandedLink)
-    harmonic = getHarmonic(indegree, expandedLink)
-    alexa_metrics = get_alexa_metrics(expandedLink)
+	tweetRatio = getTweetRatio(tweet, accountAge, numTweets)
+	indegree = getIndegree(expandedLink)
+	harmonic = getHarmonic(indegree, expandedLink, F_HARMONIC)
+	alexa_metrics = get_alexa_metrics(expandedLink)
 
-  
-    features = (tid,
-                numFriends,
-                numFollowers,
-                folFriendRatio,
-                timesListed,
+
+	features = (tid,
+				numFriends,
+				numFollowers,
+				folFriendRatio,
+				timesListed,
 				hasUrl,
 				isVerified,
 				numTweets,
@@ -268,26 +284,27 @@ def gen_features(tweet):
 				accountAge,
 				hasProfileImg,
 				hasHeaderImg,
-                tweetRatio,
-                indegree,
-                harmonic,
-                *alexa_metrics)
+				tweetRatio,
+				indegree,
+				harmonic,
+				alexa_metrics)
 
-    return features
+	return features
 
 def read_args():
     if len(sys.argv) == 2:
         tweets_data_path = sys.argv[1]
     else:
-        tweets_data_path = '../dataset/fake_real_tweets_training.json'
-
+        tweets_data_path = '*.json'
+	return tweets_data_path
+	
 def main():
-    fin = read_args()
-    with open(fin) as f:
-        for line in f:
-            tweet = json.loads(line)
-            user_features = gen_features(tweet)
-            print(user_features)
+	fin = read_args()
+	with open(fin) as f:
+		for line in f:
+			tweet = json.loads(line)
+			user_features = gen_features(tweet)
+			print user_features
 
-if __name__ == '__main_':
+if __name__ == '__main__':
     main()

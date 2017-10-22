@@ -19,6 +19,7 @@ from nltk.tag import pos_tag
 from nltk.tokenize import word_tokenize
 from langdetect import detect
 from collections import Counter
+from urlparse import urlparse
 
 
 F_HARMONIC = "D:/Downloads/hostgraph-h.tsv/hostgraph-h.tsv"
@@ -36,7 +37,7 @@ F_POSITIVE = "C:/Users/imaad/twitteradvancedsearch/senti_words/positive-words.tx
 
 def getNumUppercaseChars(tweet):
     count = 0
-    postText = tweet['text']
+    postText = tweet['full_text']
     for i in postText:
         postTextStr = i.encode('utf-8', 'ignore')
     postTextStr =  re.sub(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+','', postTextStr) # URLs
@@ -91,26 +92,30 @@ def hasExternalLinks(tweets_data):
             return False
 
 def getWotTrustValue(expandUrlName):
-    if "/" in expandUrlName:
-        expandUrlName1 = expandUrlName.split("/")[2:3]
-    else:
-        expandUrlName1 = expandUrlName.split("/")[:]
-    expandUrlNameStr = str(expandUrlName1[0])
-    url = "http://api.mywot.com/0.4/public_link_json2?hosts="+ expandUrlNameStr +"/&key=108d4b2a42ea1afc370e668b39cabdceaa19fcf0"
-    #print url
-    response = urllib.urlopen(url)
-    data = json.load(response)
-    #print data
-    if data:
-        try:
-            dataTrust = data[expandUrlNameStr]['0']
-            valueTrust = dataTrust[0]
-            confTrust = dataTrust[1]
-            value = valueTrust * confTrust / 100
-            #print value[0]
-            return value
-        except KeyError:
-            return 0
+	if expandUrlName == None:
+		return 0
+	parse_obj = urlparse(expandUrlName)
+	expandUrlNameStr = str(parse_obj.netloc)
+	#if "/" in expandUrlName:
+		#expandUrlName1 = expandUrlName.split("/")[2:3]
+	#else:
+		#expandUrlName1 = expandUrlName.split("/")[:]
+	#expandUrlNameStr = str(expandUrlName1[0])
+	url = "http://api.mywot.com/0.4/public_link_json2?hosts="+ expandUrlNameStr +"/&key=108d4b2a42ea1afc370e668b39cabdceaa19fcf0"
+	#print url
+	response = urllib.urlopen(url)
+	data = json.load(response)
+	#print data
+	if data:
+		try:
+			dataTrust = data[expandUrlNameStr]['0']
+			valueTrust = dataTrust[0]
+			confTrust = dataTrust[1]
+			value = valueTrust * confTrust / 100
+			#print value[0]
+			return value
+		except KeyError:
+			return 0
 
 def numNouns(postText):
     is_noun = lambda pos: pos[:2] == 'NN'
@@ -135,7 +140,7 @@ def isAnImage(url):
             return True
         else:
             return False
-    except AttributeError, IOError:
+    except Exception,e:
         return False
 
 def expandedUrl(shortenedUrl):
@@ -246,9 +251,8 @@ header = ('id',
           'readabilityValue')
 
 def gen_features(tweet):
-	print "Hello"
 	tid = tweet['id_str']
-	ttext = tweet['text']
+	ttext = tweet['full_text']
 	tlength = len(ttext)
 	twords = len(ttext.split())
 	counts = Counter(ttext)
@@ -317,7 +321,7 @@ def read_args():
     if len(sys.argv) == 2:
         tweets_data_path = sys.argv[1]
     else:
-        tweets_data_path = 'C:/Users/imaad/twitteradvancedsearch/real_tweets.json'
+        tweets_data_path = '*.json'
 	return tweets_data_path
 def main():
 	fin = read_args()
